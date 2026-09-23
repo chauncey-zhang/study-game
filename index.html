@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#4f6ef7" />
+<meta name="description" content="小学一年级到初三全科学习闯关游戏" />
+<!-- iOS 添加到主屏幕：全屏运行、状态栏沉浸 -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="知识大冒险" />
+<!-- 禁止自动识别电话/邮箱/地址 -->
+<meta name="format-detection" content="telephone=no, email=no, address=no" />
+<title>知识大冒险 - 学习闯关游戏</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="icon.svg" />
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="bg-deco" id="bgDeco"></div>
+<div class="flash" id="flash"></div>
+
+<div class="app">
+  <!-- 顶部栏 -->
+  <div class="topbar">
+    <div class="brand"><span class="logo">🎓</span>知识大冒险</div>
+    <div class="stats" id="hudStats" style="visibility:hidden">
+      <div class="lv-badge" id="levelBadge">⭐ Lv.1</div>
+      <div class="stat">⚡ <span class="num" id="xpNum">0</span></div>
+      <div class="stat">🏆 <span class="num" id="starNum">0</span></div>
+      <div class="stat">🍖 <span class="num" id="foodNum">0</span></div>
+      <div class="stat">🪙 <span class="num" id="coinNum">0</span></div>
+      <button class="btn btn-icon" id="musicBtn" title="背景音乐">🎵</button>
+      <button class="btn btn-icon" id="shopBtn" title="积分商店">🛒</button>
+      <button class="btn btn-icon pet-btn" id="petBtn" title="宠物乐园">🐾</button>
+      <button class="btn btn-icon" id="wrongBtn" title="错题本">📒</button>
+      <button class="btn btn-icon" id="badgeBtn" title="我的成就">🏅</button>
+      <button class="btn btn-icon user-btn" id="userBtn" title="用户中心">👤</button>
+    </div>
+  </div>
+  <script>
+    /* 尽早按本地保存还原音乐按钮图标，避免刷新时先显示默认 🎵 再闪变成 🔇 */
+    (function () {
+      try {
+        var off = localStorage.getItem('study-adventure-music') === 'off';
+        var b = document.getElementById('musicBtn');
+        if (b) {
+          b.textContent = off ? '🔇' : '🎵';
+          b.style.opacity = off ? '0.55' : '1';
+          b.title = off ? '背景音乐：关（点击开启）' : '背景音乐：开（点击关闭）';
+        }
+        document.body.classList.toggle('music-playing', !off);
+      } catch (e) {}
+    })();
+  </script>
+
+  <!-- 主页 -->
+  <div class="screen hidden" id="homeScreen">
+    <div class="section-title">📚 选择年级</div>
+    <div class="grades" id="gradeList" data-nav="true"></div>
+    <div class="home-scroll">
+      <div class="section-title" style="margin-top:.6rem">🎯 选择科目（闯关打怪）</div>
+      <div class="subjects" id="subjectList" data-nav="true"></div>
+    <div class="section-title" style="margin-top:.6rem">🚀 专项训练</div>
+    <div class="special-row" data-nav="true">
+      <button class="special-card" id="mentalHubBtn"><span class="sp-icon">🧮</span><span><b>口算特训</b><small>每日打卡 · 逐题计时 · 效果对比</small></span></button>
+      <button class="special-card" id="wordHubBtn"><span class="sp-icon">🔤</span><span><b>单词特训</b><small>年级词库闯关 · 错词复习</small></span></button>
+      <button class="special-card" id="classicBtn"><span class="sp-icon">📚</span><span><b>四大名著</b><small>卡片动画 · 轻松读懂经典</small></span></button>
+      <button class="special-card" id="thinkHubBtn"><span class="sp-icon">🧠</span><span><b>思维素养</b><small>找规律 · 逻辑推理 · 图形空间</small></span></button>
+      <button class="special-card" id="writingBtn"><span class="sp-icon">✍️</span><span><b>作文专区</b><small>写作技巧 · 美词美句 · 常用谚语</small></span></button>
+      <button class="special-card" id="pinyinBtn"><span class="sp-icon">🔤</span><span><b>拼音乐园</b><small>拼音读音 · 笔顺 · 练笔</small></span></button>
+      <button class="special-card" id="phonicsBtn"><span class="sp-icon">🔠</span><span><b>音标学院</b><small>元音 · 辅音 · 清浊对比 · 挑战</small></span></button>
+      <button class="special-card" id="storiesBtn"><span class="sp-icon">📖</span><span><b>故事乐园</b><small>230 个睡前故事 · 放松 · 朗读</small></span></button>
+      <button class="special-card" id="grammarBtn"><span class="sp-icon">📝</span><span><b>语法课堂</b><small>54 个语法点 · 来源讲解 · 训练</small></span></button>
+      <button class="special-card" id="gameHubBtn"><span class="sp-icon">🎮</span><span><b>休闲游戏</b><small>32 款益智小游戏 · 记录进度</small></span></button>
+    </div>
+    </div>
+  </div>
+
+  <!-- 词库顺序闯关（人教版） -->
+  <div class="screen hidden" id="wordLibScreen">
+    <div class="battle-head">
+      <button class="btn btn-icon back" id="wordLibBack">←</button>
+      <div class="battle-info"><div class="title">📖 词库顺序闯关</div><div class="sub" id="wordLibSub"></div></div>
+    </div>
+    <div class="hub-body" data-nav="true">
+      <div class="hub-card">
+        <div class="hub-label">📗 选择年级</div>
+        <div class="count-row" id="wordLibGradeRow"></div>
+        <div class="hub-info" id="wordLibProgress" style="margin-top:.45rem"></div>
+        <div style="font-size:.72rem;color:var(--muted)">⭐ = 考试重点词 · 每词自动朗读 · 音标展示在题目下方</div>
+      </div>
+      <div class="hub-card">
+        <div class="hub-label">🗺️ 关卡地图（逐关解锁）</div>
+        <div class="level-map" id="wordLibMap" style="max-height:22rem" data-nav="true"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 四大名著书单 -->
+  <div class="screen hidden" id="classicHubScreen">
+    <div class="battle-head">
+      <button class="btn btn-icon back" id="classicBack">←</button>
+      <div class="battle-info"><div class="title">📚 四大名著</div><div class="sub">卡片动画 · 轻松读懂经典 · 点 🔊 听讲解</div></div>
+    </div>
+    <div class="hub-body" data-nav="true">
+      <div class="classic-grid" id="classicGrid"></div>
+    </div>
+  </div>
+
+  <!-- 名著详情 -->
+  <div class="screen hidden" id="classicBookScreen">
+    <div class="battle-head">
+      <button class="btn btn-icon back" id="classicBookBack">←</button>
+      <div class="battle-info"><div class="title" id="cbTitle"></div><div class="sub" id="cbSub"></div></div>
+    </div>
+    <div class="hub-body" data-nav="true">
+      <div class="hub-card" id="cbIntro"></div>
+      <div class="section-title" style="margin:.2rem 0 .1rem">👑 传奇人物</div>
+      <div id="cbPeople"></div>
+      <div class="section-title" style="margin:.6rem 0 .1rem">📖 经典故事（按书中顺序）</div>
+      <div id="cbStories"></div>
+      <div class="section-title" style="margin:.6rem 0 .1rem">📜 全书章回（<span id="cbChCount">0</span> 回 · 按原著顺序 · 点开阅读）</div>
+      <div class="hub-card"><div class="cl-words" id="cbChapters"></div></div>
+    </div>
+  </div>
+
+  <!-- 章回阅读器 -->
+  <div class="modal-mask" id="chapterModal">
+    <div class="modal modal-flex" style="max-width:32rem">
+      <h3 id="chTitle"></h3>
+      <div class="ch-body" id="chBody"></div>
+      <div class="pp-ctrl">
+        <button class="btn btn-outline" id="chPrev">⏮ 上回</button>
+        <button class="btn btn-outline" id="chRead">🔊 朗读</button>
+        <button class="btn btn-outline" id="chAuto">🔁 连播</button>
+        <button class="btn btn-outline" id="chNext">⏭ 下回</button>
+        <button class="btn btn-primary" id="chClose">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 皮影戏剧场 -->
+  <div class="modal-mask" id="puppetModal">
+    <div class="modal modal-flex" style="max-width:32rem">
+      <h3>🎭 皮影戏 · <span id="ppTitle"></span></h3>
+      <div class="puppet-stage" id="puppetStage">
+        <div class="pp-beam"></div>
+        <span class="pp-lantern" style="left:.9rem">🏮</span>
+        <span class="pp-lantern" style="right:.9rem;animation-delay:1.4s">🏮</span>
+        <div class="pp-cast" id="ppCast"></div>
+        <div class="pp-sub" id="ppSub"></div>
+      </div>
+      <div class="pp-ctrl">
+        <button class="btn btn-outline" id="ppPrev">⏮ 上一幕</button>
+        <button class="btn btn-primary" id="ppPlay">⏸ 暂停</button>
+        <button class="btn btn-outline" id="ppNext">⏭ 下一幕</button>
+        <button class="btn btn-outline" id="ppSound">🔊</button>
+        <button class="btn btn-primary" id="ppClose">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 口算特训配置 -->
+  <div class="screen hidden" id="mentalHubScreen">
+    <div class="battle-head">
+      <button class="btn btn-icon back" id="mentalHubBack">←</button>
+      <div class="battle-info"><div class="title">🧮 口算特训</div><div class="sub" id="mentalHubSub"></div></div>
+    </div>
+    <div class="hub-body" data-nav="true">
+      <div class="hub-card">
+        <div class="hub-label">📝 本次题量</div>
+        <div class="count-row" id="mentalCountRow"></div>
+        <div class="custom-count">✏️ 自定义数量：<input type="number" id="mentalCustomInput" min="5" max="200" placeholder="5~200"><button class="btn btn-outline custom-apply" id="mentalCustomBtn">确定</button></div>
+        <button class="btn btn-primary hub-start" id="mentalStartBtn">🚀 一键生成，开始挑战！</button>
+      </div>
+      <div class="hub-card">
+        <div class="hub-label">📅 我的打卡</div>
+        <div id="mentalStreakInfo" class="hub-info"></div>
+        <div id="mentalTrend" class="trend-wrap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 单词特训配置 -->
+  <div class="screen hidden" id="wordHubScreen">
+    <div class="battle-head">
+      <button class="btn btn-icon back" id="wordHubBack">←</button>
+      <div class="battle-info"><div class="title">🔤 单词特训</div><div class="sub" id="wordHubSub"></div></div>
+    </div>
+    <div class="hub-body" data-nav="true">
+      <div class="hub-card">
+        <div class="hub-label">📝 本次词量</div>
+        <div class="count-row" id="wordCountRow"></div>
+        <div class="custom-count">✏️ 自定义数量：<input type="number" id="wordCustomInput" min="5" max="100" placeholder="5~100"><button class="btn btn-outline custom-apply" id="wordCustomBtn">确定</button></div>
+        <button class="btn btn-primary hub-start" id="wordStartBtn">🚀 开始单词闯关（随机抽词）！</button>
+        <button class="btn btn-gold hub-start" id="wordReviewBtn" style="display:none">📖 复习错词</button>
+      </div>
+      <div class="hub-card">
+        <div class="hub-label">📚 词库顺序闯关（人教版 3~9 年级）</div>
+        <div style="font-size:.72rem;color:var(--muted);margin-bottom:.5rem">按教材顺序逐关拼词 · 每关 10 词 · 含音标 + 自动读音 + ⭐重点词标识 · 进度自动保存</div>
+        <button class="btn btn-primary hub-start" id="wordLibBtn" style="margin-bottom:0">进入词库闯关 →</button>
+      </div>
+      <div class="hub-card">
+        <div class="hub-label">📊 词库统计</div>
+        <div id="wordStatsInfo" class="hub-info"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 思维素养配置 -->
+  <div class="screen hidden" id="thinkHubScreen">
+    <div class="battle-head">
+      <button class="btn btn-icon back" id="thinkHubBack">←</button>
+      <div class="battle-info"><div class="title">🧠 思维素养</div><div class="sub" id="thinkHubSub"></div></div>
+    </div>
+    <div class="hub-body" data-nav="true">
+      <div class="hub-card">
+        <div class="hub-label">📝 本次题量</div>
+        <div class="count-row" id="thinkCountRow"></div>
+        <div class="custom-count">✏️ 自定义数量：<input type="number" id="thinkCustomInput" min="5" max="60" placeholder="5~60"><button class="btn btn-outline custom-apply" id="thinkCustomBtn">确定</button></div>
+      </div>
+      <div class="hub-card">
+        <div class="hub-label">🧩 选题型（点击切换，可多选）</div>
+        <div class="think-types" id="thinkTypeRow" data-nav="true"></div>
+        <button class="btn btn-primary hub-start" id="thinkStartBtn">🚀 开始思维挑战！</button>
+      </div>
+      <div class="hub-card">
+        <div class="hub-label">📅 我的打卡</div>
+        <div id="thinkStreakInfo" class="hub-info"></div>
+        <div id="thinkTrend" class="trend-wrap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 作文专区 -->
+  <div class="screen hidden" id="writingHubScreen">
+    <div class="battle-head">
+      <button class="btn btn-icon back" id="writingBack">←</button>
+      <div class="battle-info"><div class="title">✍️ 作文专区</div><div class="sub">写作技巧 · 美词美句 · 常用谚语</div></div>
+    </div>
+    <div class="hub-body" data-nav="true">
+      <div class="w-daily" id="wDaily"></div>
+      <div class="writing-tabs" id="writingTabs" data-nav="true"></div>
+      <div class="writing-list" id="writingList"></div>
+    </div>
+  </div>
+
+  <!-- 拼音乐园 -->
+  <div class="screen hidden" id="pinyinHubScreen">
+    <div class="battle-head">
+      <button class="btn btn-icon back" id="pinyinBack">←</button>
+      <div class="battle-info"><div class="title">🔤 拼音乐园</div><div class="sub">拼音读音 · 口诀记忆 · 笔顺动画 · 练笔判分</div></div>
+    </div>
+    <div class="hub-body" data-nav="true">
+      <div class="pinyin-tabs" id="pinyinTabs" data-nav="true"></div>
+      <div class="pinyin-list" id="pinyinList"></div>
+    </div>
+  </div>
+
+  <!-- 拼音详情（读音/笔顺/练笔） -->
+  <div class="modal-mask" id="pinyinModal">
+    <div class="modal pinyin-modal">
+      <h3>🔤 拼音 · <span id="pyTitle"></span></h3>
+      <div class="py-big" id="pyBig"></div>
+      <button class="btn btn-primary" id="pyReadBtn" style="width:100%;margin-bottom:.6rem;padding:.7rem">🔊 听读音</button>
+      <div class="py-jingle" id="pyJingle"></div>
+      <div class="py-word" id="pyWord"></div>
+      <div class="py-section">
+        <div class="py-section-title">✏️ 笔画书写顺序（点击播放动画）</div>
+        <div class="py-letter-tabs" id="pyLetterTabs" data-nav="true"></div>
+        <canvas class="py-canvas" id="pyStrokeCanvas"></canvas>
+        <button class="btn btn-outline" id="pyPlayBtn" style="width:100%;padding:.7rem">▶ 播放笔顺</button>
+      </div>
+      <div class="py-section">
+        <div class="py-section-title">🖊️ 练一练（照着淡色字描，然后判分）</div>
+        <div class="py-canvas-box">
+          <canvas class="py-canvas py-canvas-base" id="pyTemplateCanvas"></canvas>
+          <canvas class="py-canvas py-canvas-top" id="pyWriteCanvas"></canvas>
+        </div>
+        <div class="py-ctrl">
+          <button class="btn btn-outline" id="pyClearBtn" style="flex:1;padding:.7rem">🧹 清空</button>
+          <button class="btn btn-primary" id="pyCheckBtn" style="flex:1;padding:.7rem">✅ 判断准确度</button>
+        </div>
+        <div id="pyScore"></div>
+      </div>
+      <button class="btn btn-primary modal-close" id="pinyinClose" style="margin-top:.6rem">关闭</button>
+    </div>
+  </div>
+
+  <!-- 英语音标学院 -->
+  <div class="screen hidden" id="phonicsHubScreen">
+    <div class="battle-head">
+      <button class="btn btn-icon back" id="phonicsBack">←</button>
+      <div class="battle-info"><div class="title">🔠 音标学院</div><div class="sub">元音 · 辅音 · 清浊对比 · 音标挑战</div></div>
+    </div>
+    <div class="hub-body" data-nav="true">
+      <div class="writing-tabs" id="phoTabs" data-nav="true"></div>
+      <div id="phoDaily" class="pho-daily"></div>
+      <div class="pinyin-list" id="phoList"></div>
+    </div>
+  </div>
+
+  <!-- 音标详情（口型/口诀/拼写/例词/清浊对比） -->
+  <div class="modal-mask" id="phonicsModal">
+    <div class="modal pinyin-modal">
+      <h3>🔠 音标 · <span id="phoTitle"></span></h3>
+      <div class="py-big" id="phoBig"></div>
+      <button class="btn btn-primary" id="phoReadBtn" style="width:100%;margin-bottom:.6rem;padding:.7rem">🔊 听发音 + 例词</button>
+      <div class="pho-type" id="phoType"></div>
+      <div class="py-jingle" id="phoMouth" style="margin-top:.5rem"></div>
+      <div class="py-word" id="phoTip"></div>
+      <div class="py-word" id="phoSpells"></div>
+      <div class="pho-words" id="phoWords"></div>
+      <div id="phoPairInfo"></div>
+      <button class="btn btn-primary modal-close" id="phonicsClose" style="margin-top:.6rem">关闭</button>
+    </div>
+  </div>
+
+  <!-- 故事乐园 -->
+  <div class="screen hidden" id="storiesHubScreen">
+    <div class="battle-head">
+      <button class="btn btn-icon back" id="storiesBack">←</button>
+      <div class="battle-info"><div class="title">📖 故事乐园</div><div class="sub">睡前故事 · 经典童话 · 寓言 · 成语 · 神话 · 科普</div></div>
+    </div>
+    <div class="hub-body" data-nav="true">
+      <div class="writing-tabs" id="storyTabs" data-nav="true"></div>
+      <div id="storyDaily" class="w-daily"></div>
+      <div class="pinyin-list" id="storyList"></div>
+    </div>
+  </div>
+
+  <!-- 故事详情（朗读/收藏/上下篇） -->
+  <div class="modal-mask" id="storyModal">
+    <div class="modal story-modal">
+      <h3>📖 <span id="storyTitle"></span></h3>
+      <div class="story-meta"><span id="storyCat" class="w-tag"></span><button class="btn btn-outline" id="storyFav" style="padding:.35rem .7rem;font-size:.82rem">☆ 收藏</button></div>
+      <div class="story-text" id="storyText"></div>
+      <div class="story-ctrl">
+        <button class="btn btn-outline" id="storyPrev">⬅ 上一篇</button>
+        <button class="btn btn-primary" id="storyPlay">🔊 朗读</button>
+        <button class="btn btn-outline" id="storyNext">下一篇 ➡</button>
+      </div>
+      <button class="btn btn-primary modal-close" id="storyClose" style="margin-top:.6rem">关闭</button>
+    </div>
+  </div>
+
+  <!-- 语法课堂 -->
+  <div class="screen hidden" id="grammarHubScreen">
+    <div class="battle-head">
+      <button class="btn btn-icon back" id="grammarBack">←</button>
+      <div class="battle-info"><div class="title">📝 语法课堂</div><div class="sub">词类 · 时态 · 语态 · 句型 · 从句 · 来源讲解 · 训练</div></div>
+    </div>
+    <div class="hub-body" data-nav="true">
+      <div class="writing-tabs" id="grammarTabs" data-nav="true"></div>
+      <div class="pinyin-list" id="grammarList"></div>
+    </div>
+  </div>
+
+  <!-- 语法详情（口诀/来源/要点/规则/示例/避坑） -->
+  <div class="modal-mask" id="grammarModal">
+    <div class="modal gr-modal">
+      <h3>📝 <span id="grTitle"></span></h3>
+      <div class="story-meta" id="grMeta"></div>
+      <button class="btn btn-primary" id="grReadBtn" style="width:100%;margin-bottom:.5rem;padding:.6rem">🔊 听讲解</button>
+      <div class="gr-box gr-mn"><div class="gr-box-body" id="grMnemonic"></div><button class="btn btn-outline gr-small-btn" id="grMnSay" style="padding:.2rem .5rem;font-size:.72rem">🔊</button></div>
+      <div class="gr-box gr-origin"><div id="grOrigin"></div></div>
+      <div class="gr-box"><div id="grKeyPoints"></div></div>
+      <div class="gr-box"><div id="grRule"></div></div>
+      <div class="gr-box"><div id="grExamples"></div></div>
+      <div class="gr-box gr-tips"><div id="grTips"></div></div>
+      <div class="gr-actions">
+        <button class="btn btn-outline" id="grFav" style="flex:1;padding:.6rem">☆ 收藏</button>
+        <button class="btn btn-primary" id="grTrainBtn" style="flex:1.5;padding:.6rem">🎯 训练该语法点</button>
+      </div>
+      <button class="btn btn-primary modal-close" id="grammarClose" style="margin-top:.5rem">关闭</button>
+    </div>
+  </div>
+
+  <!-- 休闲游戏大厅 -->
+  <div class="screen hidden" id="gameHubScreen">
+    <div class="battle-head">
+      <button class="btn btn-icon back" id="gameHubBack">←</button>
+      <div class="battle-info"><div class="title">🎮 休闲游戏</div><div class="sub">32 款益智小游戏 · 放松 · 记录进度</div></div>
+    </div>
+    <div class="hub-body" data-nav="true">
+      <div class="writing-tabs" id="gameTabs" data-nav="true"></div>
+      <div class="game-list" id="gameList"></div>
+    </div>
+  </div>
+
+  <!-- 游戏页 -->
+  <div class="screen hidden" id="gamePlayScreen">
+    <div class="battle-head">
+      <button class="btn btn-icon back" id="gameExitBtn">←</button>
+      <div class="battle-info"><div class="title" id="gamePlayTitle">🎮</div><div class="sub" id="gamePlayHud"></div></div>
+      <button class="btn btn-outline" id="gamePauseBtn" style="padding:.4rem .8rem;font-size:.85rem">⏸ 暂停</button>
+    </div>
+    <div class="game-area" id="gamePlayArea"></div>
+    <div class="game-ctrl">
+      <button class="btn btn-primary" id="gameStartBtn">▶ 开始</button>
+      <button class="btn btn-outline" id="gameResetBtn">↻ 重玩</button>
+    </div>
+  </div>
+
+  <!-- 关卡地图 -->
+  <div class="screen hidden" id="levelMapScreen">
+    <div class="battle-head">
+      <button class="btn btn-icon back" id="mapBackBtn">←</button>
+      <div class="battle-info">
+        <div class="title" id="mapTitle"></div>
+        <div class="sub" id="mapSub"></div>
+      </div>
+    </div>
+    <div class="mode-bar" id="modeBar" data-nav="true"></div>
+    <div class="level-map" id="levelMap" data-nav="true"></div>
+  </div>
+
+  <!-- 战斗页 -->
+  <div class="screen hidden" id="battleScreen">
+    <div class="battle-head">
+      <button class="btn btn-icon back" id="backBtn">←</button>
+      <div class="battle-info">
+        <div class="title" id="battleTitle"></div>
+        <div class="sub" id="battleSub"></div>
+      </div>
+      <div class="combo-badge" id="comboBadge">🔥 连击 x<span id="comboNum">0</span></div>
+      <div class="hp-row">
+        <div class="pet-side" id="battlePet" style="display:none"></div>
+        <div class="hero" id="heroEmoji">🦸</div>
+        <div class="heart" id="hearts"></div>
+        <div class="vs-mark" id="vsMark">⚔️</div>
+        <div class="monster" id="monsterEmoji">👾</div>
+        <div class="monster-hp"><div class="fill" id="monsterHpFill"></div></div>
+      </div>
+    </div>
+    <div class="dots" id="dots"></div>
+    <div class="question-card">
+      <div class="q-row">
+        <div class="q-text" id="qText"></div>
+        <button class="btn speak-btn" id="speakBtn" title="再听一遍">🔊</button>
+      </div>
+      <div class="q-graphic hidden" id="qGraphic"></div>
+      <div class="answer-display hidden" id="answerDisplay"></div>
+      <div class="options" id="options" data-nav="true"></div>
+      <div class="explain" id="explain"></div>
+      <button class="btn next-btn" id="nextBtn">下一题 ➜</button>
+    </div>
+  </div>
+
+  <!-- 结果页 -->
+  <div class="screen hidden" id="resultScreen">
+    <div class="result-card">
+      <div class="result-emoji" id="resultEmoji"></div>
+      <div class="result-title" id="resultTitle"></div>
+      <div class="result-sub" id="resultSub"></div>
+      <div class="result-stats">
+        <div class="result-stat"><div class="v" id="rCorrect">0</div><div class="l">答对</div></div>
+        <div class="result-stat"><div class="v" id="rXp">0</div><div class="l">获得经验</div></div>
+        <div class="result-stat"><div class="v" id="rCombo">0</div><div class="l">最高连击</div></div>
+        <div class="result-stat"><div class="v" id="rFood">+0</div><div class="l">🍖 食物</div></div>
+      </div>
+      <div class="daily-report" id="dailyReport"></div>
+      <div class="result-actions" data-nav="true">
+        <button class="btn btn-outline" id="retryBtn">🔄 再试一次</button>
+        <button class="btn btn-gold" id="nextLvBtn" style="display:none">➡️ 下一关</button>
+        <button class="btn btn-primary" id="homeBtn">🗺️ 返回地图</button>
+      </div>
+    </div>
+  </div>
+  <div class="footer">🎮 手机 / 平板 / 电脑 / 智能电视通用 · 遥控方向键 + OK键(Enter) · 返回键(Esc)</div>
+</div>
+
+<!-- 成就弹窗 -->
+<div class="modal-mask" id="badgeModal">
+  <div class="modal">
+    <h3>🏅 我的成就</h3>
+    <div class="badge-grid" id="badgeList"></div>
+    <button class="btn btn-primary modal-close" id="badgeClose">关闭</button>
+  </div>
+</div>
+
+<!-- 宠物乐园弹窗 -->
+<div class="modal-mask" id="petModal">
+  <div class="modal modal-flex">
+    <h3>🐾 宠物乐园 <small style="font-size:.8rem;color:var(--muted)">🥚 × <span id="petEggCount">0</span></small></h3>
+    <div class="hatch-area">
+      <div class="active-pet-bar" id="activePetBar"></div>
+      <div class="food-balance" id="petFoodTip">🍖 食物余量：0（喂食 1 次消耗 3）</div>
+      <div class="egg-icon" id="eggIcon">🥚</div>
+      <div class="hatch-tip">闯关获得宠物蛋 · 星级越高越容易掉 · 传说宠物等你来孵</div>
+      <button class="btn btn-gold hatch-btn" id="hatchBtn">✨ 孵 化</button>
+    </div>
+    <div class="pet-grid" id="petGrid"></div>
+    <button class="btn btn-primary modal-close" id="petClose">关闭</button>
+  </div>
+</div>
+
+<!-- 积分商店弹窗 -->
+<div class="modal-mask" id="shopModal">
+  <div class="modal modal-flex">
+    <h3>🛒 积分商店 <small style="font-size:.8rem;color:var(--muted)">🪙 × <span id="shopCoin">0</span></small></h3>
+    <div class="shop-list" id="shopList"></div>
+    <div style="font-size:.68rem;color:var(--muted);margin-top:.3rem">💡 玩休闲游戏赚金币（每局 +2，刷新最佳 +5）</div>
+    <button class="btn btn-primary modal-close" id="shopClose">关闭</button>
+  </div>
+</div>
+
+<!-- 错题本弹窗 -->
+<div class="modal-mask" id="wrongModal">
+  <div class="modal">
+    <h3>📒 错题本 <small style="font-size:.8rem;color:var(--muted)">（<span id="wrongCount">0</span> 题）</small></h3>
+    <div class="wrong-list" id="wrongList"></div>
+    <div style="display:flex;gap:.5rem">
+      <button class="btn btn-gold" id="wrongStartBtn" style="flex:1;padding:.7rem">✍️ 开始重练</button>
+      <button class="btn btn-primary" id="wrongClose" style="flex:1;padding:.7rem">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 每日签到弹窗 -->
+<div class="modal-mask" id="signModal">
+  <div class="modal" style="text-align:center">
+    <h3 style="justify-content:center">📅 每日签到</h3>
+    <div style="font-size:2.6rem">🎁</div>
+    <div style="margin:.4rem 0;font-weight:800">连续签到 <span id="signStreakNum" style="color:var(--primary)">1</span> 天</div>
+    <div style="color:var(--muted);font-size:.85rem;margin-bottom:.8rem">今日奖励：<b id="signStars" style="color:var(--gold)">⭐3</b> + <b id="signEggs" style="color:var(--accent)">🥚1</b> + <b id="signFood" style="color:#e67e22">🍖2</b><br><small>连续签到 3 天以上奖励翻倍哦</small></div>
+    <button class="btn btn-gold" id="signClaimBtn" style="width:100%;padding:.8rem">🎉 立即领取</button>
+  </div>
+</div>
+
+<!-- 用户中心弹窗 -->
+<div class="modal-mask" id="userModal">
+  <div class="modal">
+    <h3>👤 用户中心</h3>
+    <div class="user-now" id="userNow"></div>
+    <div class="user-form">
+      <input id="userNameInput" maxlength="12" placeholder="用户名（最多12个字）" autocomplete="off">
+      <input id="userPassInput" type="password" placeholder="密码" autocomplete="off">
+      <div style="display:flex;gap:.5rem">
+        <button class="btn btn-gold" id="userRegBtn" style="flex:1;padding:.6rem;white-space:nowrap;font-size:.85rem">🆕 注册</button>
+        <button class="btn btn-primary" id="userLoginBtn" style="flex:1;padding:.6rem;white-space:nowrap">🔑 登录</button>
+      </div>
+      <div style="font-size:.68rem;color:var(--muted);margin-top:.35rem">💡 注册会继承当前游客进度</div>
+    </div>
+    <div id="userListWrap" class="user-list-wrap"></div>
+    <div class="backup-area">
+      <div class="backup-title">📤 备份 / 📥 恢复（换浏览器/换设备必备）</div>
+      <textarea id="backupCode" placeholder="备份码会显示在这里，复制保存到微信/备忘录；恢复时粘贴到这里点导入"></textarea>
+      <div class="backup-btns">
+        <button class="btn btn-outline" id="backupExportBtn">📤 生成备份码</button>
+        <button class="btn btn-outline" id="backupImportBtn">📥 导入备份码</button>
+        <button class="btn btn-outline" id="backupFileBtn">📁 导出文件</button>
+        <button class="btn btn-outline" id="backupFileInBtn">📂 导入文件</button>
+      </div>
+      <input type="file" id="backupFileInput" accept=".json,.txt" style="display:none">
+      <div style="font-size:.68rem;color:var(--muted);margin-top:.35rem">💡 备份码含全部进度（等级/星星/宠物/关卡/错题）。纯本地游戏无自动云同步，用备份码即可跨浏览器恢复。</div>
+    </div>
+    <button class="btn btn-outline" id="parentEntryBtn" style="margin-bottom:.5rem;padding:.75rem;width:100%">👨‍👩‍👧 家长设置（防沉迷）</button>
+    <button class="btn btn-primary modal-close" id="userClose">关闭</button>
+  </div>
+</div>
+
+<!-- 家长设置弹窗 -->
+<div class="modal-mask" id="parentModal">
+  <div class="modal">
+    <h3>👨‍👩‍👧 家长设置 · 防沉迷</h3>
+    <div class="parent-row">
+      <span class="parent-label">连续学习时长</span>
+      <input type="number" id="parentWorkMin" min="5" max="180" step="5" autocomplete="off">
+      <span class="parent-unit">分钟</span>
+    </div>
+    <div class="parent-row">
+      <span class="parent-label">休息时长</span>
+      <input type="number" id="parentRestMin" min="1" max="60" step="1" autocomplete="off">
+      <span class="parent-unit">分钟</span>
+    </div>
+    <div class="parent-row">
+      <span class="parent-label">家长密码</span>
+      <input type="password" id="parentPwd" placeholder="留空不改" autocomplete="off" style="width:8.5rem">
+      <span class="parent-unit">留空不改</span>
+    </div>
+    <div class="parent-row">
+      <span class="parent-label">强制备份</span>
+      <label class="switch-inline"><input type="checkbox" id="parentForceBk" checked><span>下次打开时提醒备份，防止清缓存丢进度</span></label>
+    </div>
+    <div class="parent-tip">学习达到设定时长后会弹出全屏休息提醒，休息结束才能继续。</div>
+    <div style="display:flex;gap:.5rem;margin-top:.6rem">
+      <button class="btn btn-primary" id="parentSaveBtn" style="flex:1;padding:.7rem">💾 保存</button>
+      <button class="btn btn-outline" id="parentClose" style="flex:1;padding:.7rem">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 家长密码验证弹窗 -->
+<div class="modal-mask" id="pwdModal" style="z-index:1100">
+  <div class="modal" style="max-width:20rem">
+    <h3>🔒 家长验证</h3>
+    <div class="parent-tip" id="pwdTip" style="margin-bottom:.8rem">请输入家长密码后进入设置</div>
+    <input type="password" id="pwdInput" placeholder="请输入密码" autocomplete="off" style="width:100%;padding:.6rem .7rem;border:.12rem solid #dbe4ff;border-radius:.6rem;font-size:1rem;text-align:center;margin-bottom:.8rem;box-sizing:border-box;font-family:inherit">
+    <div style="display:flex;gap:.5rem">
+      <button class="btn btn-primary" id="pwdOkBtn" style="flex:1;padding:.6rem">确定</button>
+      <button class="btn btn-outline" id="pwdCancelBtn" style="flex:1;padding:.6rem">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 防沉迷休息弹窗（全屏覆盖） -->
+<div class="modal-mask rest-mask" id="restModal">
+  <div class="rest-card">
+    <div class="rest-icon">🌿</div>
+    <h3>休息一下</h3>
+    <p>已经学习了一段时间啦，<br>让眼睛和大脑放松一下吧～</p>
+    <div class="rest-count" id="restCount">05:00</div>
+    <div class="rest-tip">倒计时结束后自动继续，提前退出需家长密码</div>
+    <button class="btn btn-primary rest-btn" id="restDoneBtn">我休息好了，继续学习</button>
+  </div>
+</div>
+
+<!-- 强制备份弹窗（上次关闭未备份时，下次打开提醒） -->
+<div class="modal-mask rest-mask" id="backupModal">
+  <div class="rest-card">
+    <div class="rest-icon">📁</div>
+    <h3>先备份一下再开始吧</h3>
+    <p>检测到你上次使用后没有完成备份，<br>为防止浏览器清缓存丢失进度，<br>建议先备份一次学习进度。</p>
+    <div class="rest-tip">文件在 文件管理 → Download 文件夹，<br>也可发送到微信/网盘/U 盘妥善保管</div>
+    <button class="btn btn-primary rest-btn" id="backupNowBtn" style="margin-bottom:.6rem">📁 立即备份</button>
+    <button class="btn btn-outline rest-btn" id="backupSkipBtn">暂不备份，先玩</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="data/chinese.js"></script>
+<script src="data/math.js"></script>
+<script src="data/english.js"></script>
+<script src="data/physics.js"></script>
+<script src="data/chemistry.js"></script>
+<script src="data/biology.js"></script>
+<script src="data/geography.js"></script>
+<script src="data/history.js"></script>
+<script src="data/politics.js"></script>
+<script src="data/generated.js"></script>
+<script src="data/words-pep.js"></script>
+<script src="data/classics.js"></script>
+<script src="data/classics-chs.js"></script>
+<script src="data/think.js"></script>
+<script src="data/writing.js"></script>
+<script src="data/pinyin.js"></script>
+<script src="data/phonics.js"></script>
+<script src="data/stories.js"></script>
+<script src="data/stories-bedtime-a.js"></script>
+<script src="data/stories-bedtime-b.js"></script>
+<script src="data/stories-fairy-a.js"></script>
+<script src="data/stories-fairy-b.js"></script>
+<script src="data/stories-fable-a.js"></script>
+<script src="data/stories-fable-b.js"></script>
+<script src="data/stories-idiom-a.js"></script>
+<script src="data/stories-idiom-b.js"></script>
+<script src="data/stories-idiom-c.js"></script>
+<script src="data/stories-myth-a.js"></script>
+<script src="data/stories-myth-b.js"></script>
+<script src="data/stories-folk-a.js"></script>
+<script src="data/stories-folk-b.js"></script>
+<script src="data/stories-science-a.js"></script>
+<script src="data/stories-science-b.js"></script>
+<script src="data/stories-english-a.js"></script>
+<script src="data/stories-english-b.js"></script>
+<script src="data/grammar.js"></script>
+<script src="data/grammar-word.js"></script>
+<script src="data/grammar-tense.js"></script>
+<script src="data/grammar-sentence.js"></script>
+<script src="data/grammar-rule.js"></script>
+<script src="data/games.js"></script>
+
+<script src="js/01-core.js"></script>
+<script src="js/02-classics.js"></script>
+<script src="js/03-basic.js"></script>
+<script src="js/04b-backup.js"></script>
+<script src="js/04-pet.js"></script>
+<script src="js/05-training.js"></script>
+<script src="js/06-think.js"></script>
+<script src="js/07-level.js"></script>
+<script src="js/08-route.js"></script>
+<script src="js/09-tv.js"></script>
+<script src="js/12-writing.js"></script>
+<script src="js/13-pinyin.js"></script>
+<script src="js/14-phonics.js"></script>
+<script src="js/15-stories.js"></script>
+<script src="js/16-grammar.js"></script>
+<script src="js/17-games.js"></script>
+<script src="js/games/01-strategy.js"></script>
+<script src="js/games/02-number.js"></script>
+<script src="js/games/03-eliminate.js"></script>
+<script src="js/games/04-react.js"></script>
+<script src="js/games/05-path.js"></script>
+<script src="js/games/06-observe.js"></script>
+<script src="js/18-shop.js"></script>
+<script src="js/10-init.js"></script>
+<script src="js/11-anti.js"></script>
+<script>
+  /* PWA 增强：仅 http/https 下注入 manifest 与注册 Service Worker。
+   * file:// 双击打开时自动跳过，避免 manifest.json 触发 CORS 报错，不影响双击即玩 */
+  (function () {
+    var isHttp = location.protocol === 'http:' || location.protocol === 'https:';
+    if (!isHttp) return;
+    /* 动态注入 manifest（file:// 下 CORS 会阻止加载并报错，故仅 http(s) 注入） */
+    try {
+      var link = document.createElement('link');
+      link.rel = 'manifest';
+      link.href = 'manifest.json';
+      document.head.appendChild(link);
+    } catch (e) {}
+    /* Service Worker 仅 secure context（https 或 localhost）可用 */
+    if (!('serviceWorker' in navigator)) return;
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return;
+    window.addEventListener('load', function () {
+      try { navigator.serviceWorker.register('sw.js'); } catch (e) {}
+    });
+  })();
+</script>
+</body>
+</html>

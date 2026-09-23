@@ -1,0 +1,16 @@
+{
+  "name": "知识大冒险 - 学习闯关游戏",
+  "short_name": "知识大冒险",
+  "description": "小学一年级到初三全科学习闯关游戏",
+  "lang": "zh-CN",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#eef2ff",
+  "theme_color": "#4f6ef7",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
