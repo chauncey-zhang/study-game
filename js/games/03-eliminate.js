@@ -57,11 +57,20 @@ regGame('linkup', function (ctx) {
 
 /* ===== 俄罗斯方块 ===== */
 regGame('tetris', function (ctx) {
-  var CW=10,CH=20,CS=20, board, cur, cx, cy, score, over, acc, spd, curColor;
+  var CW=20,CH=30,CS=16, board, cur, cx, cy, score, over, acc, spd, curColor;
+  /* 按容器可用空间自适应格子大小，让棋盘刚好铺满、方块保持正方形（避免固定分辨率在
+   * 大屏上停在原始尺寸、四周留白导致「舞台太小方块太大」） */
+  function layout(){
+    var area=ctx.container;
+    var aw=(area&&area.clientWidth)||320, ah=(area&&area.clientHeight)||480;
+    CS=Math.max(8, Math.floor(Math.min((aw-24)/CW, (ah-16)/CH)));
+    ctx.canvas.width=CW*CS; ctx.canvas.height=CH*CS;
+  }
+  function onResize(){ if(!over){ layout(); draw(); } }
   var SHAPES=[[[1,1,1,1]],[[1,1],[1,1]],[[0,1,0],[1,1,1]],[[1,0],[1,0],[1,1]],[[0,1],[0,1],[1,1]],[[1,1,0],[0,1,1]],[[0,1,1],[1,1,0]]];
   var COLORS=['#f87171','#fbbf24','#a78bfa','#60a5fa','#60a5fa','#34d399','#facc15'];
   function newPiece(){curColor=Math.floor(Math.random()*SHAPES.length);cur=SHAPES[curColor].map(function(r){return r.slice();});cx=Math.floor((CW-cur[0].length)/2);cy=0;}
-  function fresh(){board=[];for(var r=0;r<CH;r++){board.push([]);for(var c=0;c<CW;c++)board[r].push(0);}score=0;over=false;acc=0;spd=800;newPiece();}
+  function fresh(){board=[];for(var r=0;r<CH;r++){board.push([]);for(var c=0;c<CW;c++)board[r].push(0);}score=0;over=false;acc=0;spd=650;newPiece();}
   function collide(p,px,py){for(var r=0;r<p.length;r++)for(var c=0;c<p[r].length;c++){if(p[r][c]){var x=px+c,y=py+r;if(x<0||x>=CW||y>=CH)return true;if(y>=0&&board[y][x])return true;}}return false;}
   function merge(){for(var r=0;r<cur.length;r++)for(var c=0;c<cur[r].length;c++){if(cur[r][c]){var y=cy+r;if(y<0){over=true;ctx.finish(score);return;}board[y][cx+c]=1;}}clearLines();newPiece();if(collide(cur,cx,cy)){over=true;ctx.finish(score);}}
   function clearLines(){var n=0,r;for(r=CH-1;r>=0;r--){if(board[r].every(function(v){return v;})){board.splice(r,1);board.unshift([]);for(var c=0;c<CW;c++)board[0].push(0);n++;r++;}}if(n){score+=n*n*100;spd=Math.max(200,spd-40);ctx.float('+'+n*n*100);ctx.burst(ctx.canvas.width/2,ctx.canvas.height/2,'#34d399',12);ctx.vibrate(20);SFX.pop();}}
@@ -74,16 +83,35 @@ regGame('tetris', function (ctx) {
     c.fillStyle='#f1f5f9';c.fillRect(0,0,cv.width,cv.height);
     for(var r=0;r<CH;r++)for(var cc=0;cc<CW;cc++)if(board[r][cc]){c.fillStyle='#94a3b8';c.fillRect(cc*CS,r*CS,CS-1,CS-1);}
     for(var rr=0;rr<cur.length;rr++)for(var cc2=0;cc2<cur[rr].length;cc2++)if(cur[rr][cc2]){c.fillStyle=COLORS[curColor];c.fillRect((cx+cc2)*CS,(cy+rr)*CS,CS-1,CS-1);}
-    ctx.hud('得分 '+score+' · ←→ 移动 · ↑ 旋转 · ↓ 下落');
+    ctx.hud('得分 '+score+' · ←→ 按住移动 · 点按旋转 · 按住下方加速');
   }
-  function act(d){if(over)return;if(d==='left')tryMove(-1,0);else if(d==='right')tryMove(1,0);else if(d==='down')down();else if(d==='up'){var np=rot(cur);if(!collide(np,cx,cy))cur=np;}draw();}
+  function rotate(){var np=rot(cur);if(!collide(np,cx,cy))cur=np;}
+  function act(d){if(over)return;if(d==='left')tryMove(-1,0);else if(d==='right')tryMove(1,0);else if(d==='down')down();else if(d==='up')rotate();draw();}
+  /* 触摸：按住左/右半区 → 方块持续朝该方向移动直到边界；点按 → 旋转；按住下方 → 加速下落。
+   * 用「按下时长」区分点按(短)与按住(长)：短按一律旋转，长按才移动/加速，避免点按误触加速下落。 */
+  var holdDir=null, fastDrop=false, lastHold=0, pressStart=0, pressZone=null;
+  function onPress(x,y){if(over)return;pressStart=Date.now();if(y>CH*CS*0.66)pressZone='down';else pressZone=(x<CW*CS/2)?'left':'right';}
+  function onRelease(x,y,dur,dx,dy){pressZone=null;holdDir=null;fastDrop=false;if(over)return;if(dur<250&&Math.abs(dx)<10&&Math.abs(dy)<10)rotate();draw();}
   return {
-    init:function(){ctx.canvas.width=CW*CS;ctx.canvas.height=CH*CS;fresh();draw();},
+    init:function(){layout();fresh();draw();window.addEventListener('resize',onResize);},
+    stop:function(){window.removeEventListener('resize',onResize);},
     start:fresh, reset:fresh,
-    tick:function(dt){if(over)return;acc+=16;if(acc>=spd){acc=0;down();}draw();},
+    tick:function(){
+      if(over)return;
+      var held=Date.now()-pressStart;
+      if(pressZone==='down'&&held>200)fastDrop=true;else fastDrop=false;
+      if(pressZone==='left'&&held>200)holdDir='left';else if(pressZone==='right'&&held>200)holdDir='right';else holdDir=null;
+      acc+=16;
+      if(acc>=spd){acc=0;down();}
+      if(holdDir){var now=Date.now();if(now-lastHold>=70){lastHold=now;tryMove(holdDir==='left'?-1:1,0);}}
+      if(fastDrop)down();
+      draw();
+    },
     draw:draw,
     onKey:act,
-    onSwipe:act
+    onSwipe:act,
+    onPress:onPress,
+    onRelease:onRelease
   };
 });
 
@@ -125,7 +153,8 @@ regGame('breakout', function (ctx) {
     start:fresh, reset:fresh,
     tick:update, draw:draw,
     onKey:function(d){if(over)return;if(d==='left')pad.x=Math.max(0,pad.x-18);else if(d==='right')pad.x=Math.min(W-pad.w,pad.x+18);},
-    onTap:function(x){if(over)return;pad.x=Math.max(0,Math.min(W-pad.w,x-pad.w/2));}
+    onTap:function(x){if(over)return;pad.x=Math.max(0,Math.min(W-pad.w,x-pad.w/2));},
+    onMove:function(x){if(over)return;pad.x=Math.max(0,Math.min(W-pad.w,x-pad.w/2));}
   };
 });
 

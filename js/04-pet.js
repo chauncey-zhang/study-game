@@ -1,6 +1,18 @@
 'use strict';
   /* ===================== 宠物系统 ===================== */
-  var PETS = [
+  /* 稀有度：基础经验加成(%/级)、基础食物加成(粮/级)、展示名、抽蛋概率权重 */
+  var RARITY = {
+    common: { name: '普通', xpPerLv: 3, foodPerLv: 1, weight: 70 },
+    rare:   { name: '稀有', xpPerLv: 5, foodPerLv: 2, weight: 26 },
+    legend: { name: '传说', xpPerLv: 8, foodPerLv: 3, weight: 4 }
+  };
+  var RARITY_NAME = { common: '普通', rare: '稀有', legend: '传说' };
+  var MAX_PET_LV = 100;       // 宠物等级上限
+  var FEED_BASE = 2;          // 升到 Lv.2 所需食物（之后每级翻倍）
+  var FEED_COST_CAP = 999;    // 单次喂食消耗食物上限（防止高阶天文数字）
+  var MAX_XP_BONUS = 999;     // 经验加成上限（%）
+  /* 原始 18 种（保留 id 兼容旧存档） */
+  var PETS_BASE = [
     { id:'dog',     icon:'🐶', name:'旺财',   rarity:'common' },
     { id:'cat',     icon:'🐱', name:'咪咪',   rarity:'common' },
     { id:'pig',     icon:'🐷', name:'嘟嘟',   rarity:'common' },
@@ -20,11 +32,97 @@
     { id:'dragon',  icon:'🐲', name:'烈焰',   rarity:'legend' },
     { id:'ghost',   icon:'👻', name:'豆豆',   rarity:'legend' }
   ];
-  var RARITY_NAME = { common: '普通', rare: '稀有', legend: '传说' };
+  /* 扩充用的 emoji / 名字池：250 个唯一图标，与宠物一一对应，绝不循环复用 */
+  var PET_ICONS = [
+    /* 动物 85 */
+    '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯',
+    '🦁','🐮','🐷','🐸','🐵','🙈','🙉','🙊','🐒','🐔',
+    '🐧','🐦','🐤','🐣','🐥','🦆','🦅','🦉','🦇','🐺',
+    '🐗','🐴','🦄','🐝','🐛','🦋','🐌','🐞','🐜','🦂',
+    '🐢','🐍','🦎','🦖','🦕','🐙','🦑','🐡','🐠','🐟',
+    '🐬','🐳','🐋','🦈','🐅','🐆','🐊','🐘','🐪','🐫',
+    '🦓','🦒','🐐','🐑','🐂','🐃','🐄','🐎','🐖','🦌',
+    '🦏','🦛','🐉','🐲','👻','🦃','🐚','🦞','🦪','🦭',
+    '🕷️','🦟','🪲','🪳','🪰',
+    /* 幻想精灵 15 */
+    '👾','👽','🤖','🎃','👹','👺','💀','☠️','🤡','🦴',
+    '🦷','🐾','👁️','🦿','🦾',
+    /* 植物 21 */
+    '🌵','🌲','🌳','🌴','🌱','🌿','☘️','🍀','🎋','🍃',
+    '🍂','🍁','🌾','🌷','🌹','🌺','🌸','🌼','🌻','🌰',
+    '🍄',
+    /* 自然天体 19 */
+    '🌞','🌝','🌕','🌟','⭐','🌠','🌌','☀️','⛅','🌈',
+    '❄️','☃️','⛄','🔥','💧','🌊','⚡','☁️','🌤️',
+    /* 食物精灵 90 */
+    '🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍈',
+    '🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦',
+    '🥬','🥒','🌶️','🫑','🌽','🥕','🥔','🍠','🧄','🧅',
+    '🥜','🍞','🥐','🥖','🧀','🥚','🍳','🥞','🧇','🥓',
+    '🍗','🍖','🌭','🍔','🍟','🍕','🥪','🌮','🌯','🥙',
+    '🧆','🥗','🍝','🍜','🍲','🍛','🍣','🍱','🥟','🍤',
+    '🍚','🍙','🍘','🍥','🥠','🍢','🍡','🍧','🍨','🍦',
+    '🥧','🧁','🍰','🎂','🍮','🍭','🍬','🍫','🍿','🍩',
+    '🍪','🥤','🧋','🍵','☕','🍶','🥂','🍷','🍸','🍹',
+    /* 活动物品 20 */
+    '🍾','⚽','🏀','🏈','⚾','🎾','🏐','🎱','🏓','🏸',
+    '🎯','🎲','🎮','🎸','🎺','🎻','🥁','🎤','🚀','✈️'
+  ];
+  var PET_NAMES = ['旺财','咪咪','嘟嘟','跳跳','憨憨','睡睡','皮皮','咕咕','呱呱','慢慢','灵灵','团子','冰冰','博士','墨墨','彩虹','烈焰','豆豆','淘淘','球球','点点','毛毛','糖糖','果果','乐乐','安安','可可','丁丁','花花','胖胖','小七','阿福','小白','黑米','橘座','奶酪','布丁','奶昔','雪球','煤球','栗子','松果','椰果','蜜柚','棉花','云朵','星仔','月牙','闪电','风风','火苗','小满','阿黄','柚柚','团团','圆圆','壮壮','小帅','阿宝','贝贝','妞妞','毛毛','奔奔','飞飞','跳跳','悠悠','点点','泡泡','波波','噜噜','呆呆','萌萌','皮蛋','元宝','招财','进宝','平安','喜喜','小美','帅帅','大圣','齐天','红红','火火','青青','蓝蓝','绿绿','紫紫','橙橙','粉粉','金金','银银','铁蛋','铜锣','喵喵','汪汪','咩咩','哞哞','嘎嘎','叽叽','喳喳','嗡嗡','嗡嗡','蛐蛐','扑扑','闪闪','亮亮','晶晶','灿灿','阳阳','光光','暖暖','甜甜','香香','脆脆','软软','糯糯','酥酥','小糯','阿糯','雪糕','冰淇淋','小布','布奇','奇奇','妙妙','妙妙','巧巧','可可','乐乐','欢欢','喜喜','庆庆','祥祥','瑞瑞','福福','顺顺','康康','健健','安安','宁宁','静静','恬恬','悠悠','然然','默默','小默','阿默','小语','语语','言言','小诗','诗诗','词词','小小','阿小','大壮','壮壮','铁牛','水牛','老牛','小羊','羊羊','小马','骏骏','飞马','天马','云马','小鹿','鹿鹿','小象','象象','小河','河河','小鱼','鱼鱼','小鲸','鲸鲸','海海','豚豚','鲨鲨','小龟','龟龟','小蛇','蛇蛇','小龙','龙龙','凤凤','小凤','麒麒','麟麟','凰凰','小鹤','鹤鹤','小鹰','鹰鹰','小雕','雕雕','鸮鸮','企鹅','鹅鹅','小鸭','鸭鸭','小鹅','天鹅','小蜂','蜂蜂','小蝶','蝶蝶','小蚁','蚁蚁','小蟹','蟹蟹','小虾','虾虾','小章','章章','小乌','乌乌','小鳄','鳄鳄','小虎','虎虎','小狮','狮狮','小豹','豹豹','小狼','狼狼','小狐','狐狐','小熊','熊熊','小猴','猴猴','小兔','兔兔','小鹿','小羊','小牛','小象','小鹰','小鹏','鹏鹏','小雕','飞飞','燕燕','小燕','雀雀','小雀','小鸥','鸥鸥','小鸽','鸽鸽','小雀','小鸢','鸢鸢','小隼','隼隼','小鹞','鹞鹞','小鸻','鸻鸻','小鹬','鹬鹬','小鹭','鹭鹭','小鹳','鹳鹳','小鹤','丹顶','小企','小鸬','鸬鸬','小鹚','鹚鹚','小鲣','鲣鲣','小鲷','鲷鲷','小鲈','鲈鲈','小鲤','鲤鲤','小鲫','鲫鲫','小鲶','鲶鲶','小鳗','鳗鳗','小鳝','鳝鳝','小鳅','鳅鳅','小豚','小海','小贝','贝贝','小螺','螺螺','小蚌','蚌蚌','小珊','珊珊','小瑚','瑚瑚','小珊瑚','小珍','珍珍','小宝','宝儿','小福','福儿','小禄','禄禄','小寿','寿寿','小喜','喜儿','小财','财财','小运','运运','小吉','吉吉','小祥','祥儿','小瑞','瑞儿','小安','安儿','小康','康儿','小宁','宁儿','小静','静儿','小乐','乐儿','小欢','欢儿','小笑','笑儿','小甜','甜儿','小蜜','蜜儿','小糖','糖儿','小果','果儿','小萌','萌儿','小乖','乖乖','小侠','侠侠','小剑','剑剑','小弓','弓弓','小盾','盾盾','小枪','枪枪','小锤','锤锤','小斧','斧斧','小刀','刀刀','小叉','叉叉','小矛','矛矛','小旗','旗旗','小鼓','鼓鼓','小锣','锣锣','小钹','钹钹','小铃','铃铃','小箫','箫箫','小笛','笛笛','小琴','琴琴','小瑟','瑟瑟','小磬','磬磬','小钟','钟钟','小鼓','小号','号号','小角','角角','小笙','笙笙','小竽','竽竽','小埙','埙埙','小篪','篪篪','小篴','篴篴'];
+  function rollRarity() {
+    /* 扩充宠物按稀有度权重分布（传说少、普通多），形成等级感 */
+    var r = Math.random();
+    if (r < 0.04) return 'legend';
+    if (r < 0.30) return 'rare';
+    return 'common';
+  }
+  var PETS = PETS_BASE.slice();
+  var _usedNames = {};
+  PETS_BASE.forEach(function (p) { _usedNames[p.name] = 1; });
+  for (var _pi = PETS_BASE.length; _pi < 250; _pi++) {
+    var _nm = PET_NAMES[_pi] || ('宠物' + (_pi + 1));
+    if (_usedNames[_nm]) { var _k = 2; while (_usedNames[_nm + _k]) _k++; _nm = _nm + _k; }
+    _usedNames[_nm] = 1;
+    PETS.push({
+      id: 'pet' + _pi,
+      icon: PET_ICONS[_pi % PET_ICONS.length],
+      name: _nm,
+      rarity: rollRarity()
+    });
+  }
+  /* 图鉴按稀有度排序（普通 → 稀有 → 传说），体现等级感；分桶 concat 保证 ES5 稳定顺序 */
+  (function sortPets() {
+    var common = [], rare = [], legend = [];
+    PETS.forEach(function (p) {
+      if (p.rarity === 'legend') legend.push(p);
+      else if (p.rarity === 'rare') rare.push(p);
+      else common.push(p);
+    });
+    PETS = common.concat(rare, legend);
+  })();
   function getActivePet() {
     var id = (save.activePet && save.pets.indexOf(save.activePet) !== -1) ? save.activePet : (save.pets[0] || null);
     if (!id) return null;
     return PETS.filter(function (p) { return p.id === id; })[0] || null;
+  }
+  /* 升到「下一级」所需食物：随当前等级翻倍（Lv.n→n+1 需 FEED_BASE·2^(n-1)），封顶 FEED_COST_CAP */
+  function feedCost(curLv) {
+    var c = FEED_BASE * Math.pow(2, curLv - 1);
+    return Math.min(FEED_COST_CAP, c);
+  }
+  /* 出战宠物的经验加成（%），按稀有度×等级累加，封顶 MAX_XP_BONUS */
+  function petXpBonus() {
+    var p = getActivePet();
+    if (!p) return 0;
+    var r = RARITY[p.rarity] || RARITY.common;
+    return Math.min(MAX_XP_BONUS, r.xpPerLv * (getPetLevel(p.id) - 1));
+  }
+  /* 出战宠物的结算食物加成（粮），按稀有度×等级累加 */
+  function petFoodBonus() {
+    var p = getActivePet();
+    if (!p) return 0;
+    var r = RARITY[p.rarity] || RARITY.common;
+    return r.foodPerLv * (getPetLevel(p.id) - 1);
   }
   function renderBattlePet() {
     var ap = getActivePet();
@@ -43,13 +141,18 @@
     if (!bar) return;
     if (!ap) { bar.style.display = 'none'; return; }
     var lv = getPetLevel(ap.id);
-    var canFeed = Math.floor((save.food || 0) / FEED_COST);
+    var r = RARITY[ap.rarity] || RARITY.common;
+    var cost = feedCost(lv);
+    var canFeed = Math.floor((save.food || 0) / cost);
+    var bonus = petXpBonus();
     bar.style.display = 'flex';
+    bar.style.flexWrap = 'wrap';
     bar.innerHTML =
       '<span class="ap-icon">' + petIconWithHat(ap) + '</span>' +
-      '<span class="ap-info"><b>' + ap.name + '</b> Lv.' + lv +
-      '<small>' + (lv >= 10 ? '已满级 · 经验 +45% · 结算食物 +10' : '经验 +' + ((lv - 1) * 5) + '% · 结算食物 +' + lv + ' · 🍖 余 ' + (save.food || 0) + '（可喂 ' + canFeed + ' 次）') + '</small></span>' +
-      (lv < 10 ? '<button class="btn btn-gold feed-btn" id="feedBtn">🍼 喂食 (🍖' + FEED_COST + ')</button>' : '');
+      '<span class="ap-info" style="flex:1; min-width:0"><b>' + ap.name + '</b> <span class="r-tag r-' + ap.rarity + '">' + r.name + '</span> Lv.' + lv +
+      '<small>经验 +' + bonus + '% · 结算食物 +' + petFoodBonus() +
+      (lv >= MAX_PET_LV ? '<br>已满级' : '<br>升下一级需 🍖' + cost + '（可喂 ' + canFeed + ' 次）') + '</small></span>' +
+      (lv < MAX_PET_LV ? '<button class="btn btn-gold feed-btn" id="feedBtn">🍼 喂食 (🍖' + cost + ')</button>' : '');
     var fb = $('feedBtn');
     if (fb) fb.addEventListener('click', feedPet);
   }
@@ -57,28 +160,34 @@
     var ap = getActivePet();
     if (!ap) return;
     var lv = getPetLevel(ap.id);
-    if (lv >= 10) { toast(ap.name + ' 已满级啦！'); return; }
-    if ((save.food || 0) < FEED_COST) {
-      toast('🍖 食物不足（还差 ' + (FEED_COST - (save.food || 0)) + '），闯关答题/签到可赚食物');
+    if (lv >= MAX_PET_LV) { toast(ap.name + ' 已满级啦！'); return; }
+    var cost = feedCost(lv);
+    if ((save.food || 0) < cost) {
+      toast('🍖 食物不足（还差 ' + (cost - (save.food || 0)) + '），闯关答题/签到可赚食物');
       TTS.speak('食物不够了，快去闯关赚食物吧', 0.9);
       return;
     }
-    save.food -= FEED_COST;
+    save.food -= cost;
     save.petLevels[ap.id] = lv + 1;
     SFX.levelup();
+    petCry(ap.id); /* 升级时宠物叫一声 */
     burst(window.innerWidth / 2, window.innerHeight / 2, ['🍼', '✨', ap.icon, '💖']);
-    toast('🍼 ' + ap.name + ' 升到 Lv.' + (lv + 1) + '！经验加成 +' + (lv * 5) + '%');
-    TTS.speak(ap.name + '升级啦！现在经验加成百分之' + (lv * 5), 0.9);
+    toast('🍼 ' + ap.name + ' 升到 Lv.' + (lv + 1) + '！经验加成 +' + petXpBonus() + '%');
+    /* 语音延后 350ms，避免盖住叫声 */
+    setTimeout(function () { TTS.speak(ap.name + '升级啦！现在经验加成百分之' + petXpBonus(), 0.9); }, 350);
     persist();
     updateTopbar();
     renderActivePetBar();
   }
   /* ===================== 错题本 ===================== */
-  function addToWrongBook(subjectId, grade, q) {
+  function addToWrongBook(subjectId, grade, q, mode) {
     if (!save.wrongBook) save.wrongBook = [];
     var dup = save.wrongBook.some(function (w) { return w.q === q.q; });
     if (dup) return;
-    save.wrongBook.unshift({ s: subjectId, g: grade, q: q.q, o: q.o, a: q.a, e: q.e });
+    var rec = { s: subjectId, g: grade, q: q.q, o: q.o, a: q.a, e: q.e, m: mode || 'adventure' };
+    /* 保留题目上的额外字段（ipa 音标 / key 重点词 / cn 等），否则错题重练时这些“关键字”会丢失 */
+    for (var k in q) { if (q.hasOwnProperty(k) && !(k in rec)) rec[k] = q[k]; }
+    save.wrongBook.unshift(rec);
     if (save.wrongBook.length > 50) save.wrongBook.pop(); // 上限 50 题
   }
   function removeFromWrongBook(qText) {
@@ -104,6 +213,7 @@
     wrongMode = true;
     battleWrongIdx = [];
     curSubject = null;
+    libWordMode = false; // 错题重练不属于词库闯关，避免沿用词库模式导致返回/显示错乱
     curLevel = 0;
     curQuestions = pool.map(shuffleOptions);
     SFX.start();
@@ -132,7 +242,7 @@
   }
   function renderPetModal() {
     $('petEggCount').textContent = save.eggs;
-    $('petFoodTip').textContent = '🍖 食物余量：' + (save.food || 0) + '（喂食 1 次消耗 ' + FEED_COST + '）';
+    $('petFoodTip').textContent = '🍖 食物余量：' + (save.food || 0) + '（喂食消耗随等级翻倍，升满 100 级）';
     $('hatchBtn').style.display = save.eggs > 0 ? 'inline-flex' : 'none';
     $('eggIcon').textContent = save.eggs > 0 ? '🥚' : '🕳️';
     renderActivePetBar();
@@ -141,10 +251,14 @@
     PETS.forEach(function (p) {
       var owned = save.pets.indexOf(p.id) !== -1;
       var isActive = owned && save.activePet === p.id;
+      var r = RARITY[p.rarity] || RARITY.common;
       var d = document.createElement('div');
       d.className = 'pet-card ' + (owned ? 'r-' + p.rarity + ' clickable' : 'locked') + (isActive ? ' active' : '');
-      d.title = owned ? '点击让 ' + p.name + ' 出战' : '';
-      d.innerHTML = '<div class="pi">' + (owned ? (isActive ? petIconWithHat(p) : p.icon) : '❓') + '</div><div class="pn">' + (owned ? p.name : '？？？') + '</div>' +
+      d.title = owned ? '点击让 ' + p.name + ' 出战' : (p.name + '（未拥有，孵化可获得）');
+      /* 未拥有的宠物显示为灰色真图标，不再用问号代替；普通/稀有/传说均用文字标签标识 */
+      d.innerHTML = '<div class="pi">' + (owned ? (isActive ? petIconWithHat(p) : p.icon) : p.icon) + '</div>' +
+        '<div class="pn">' + p.name + '</div>' +
+        '<div class="r-tag r-' + p.rarity + '">' + r.name + '</div>' +
         (isActive ? '<div class="active-mark">⭐出战</div>' : '');
       if (owned) {
         d.addEventListener('click', function () {
@@ -153,7 +267,7 @@
             petCry(p.id);
             d.classList.remove('hop'); void d.offsetWidth; d.classList.add('hop');
             var say = petTalk();
-            setTimeout(function () { TTS.speak(p.name + '：' + say, 0.95, 1.4); }, 350);
+            setTimeout(function () { TTS.speak(p.name + '：' + say, 0.95, 1.15); }, 350);
             toast(p.icon + ' ' + p.name + '：' + say);
           } else {
             /* 出战模式：切换出战 + 叫声 */
@@ -190,15 +304,17 @@
       if (isNew) {
         save.pets.push(pet.id);
         SFX.levelup();
-        TTS.speak('哇！孵出了' + (pool === 'legend' ? '传说宠物' : '新宠物') + pet.name + '！', 0.9);
+        petCry(pet.id); /* 新宠物出生叫一声 */
+        setTimeout(function () { TTS.speak('哇！孵出了' + (pool === 'legend' ? '传说宠物' : '新宠物') + pet.name + '！', 0.9); }, 350);
         toast('🎉 孵出新宠物：' + pet.icon + ' ' + pet.name + '（' + RARITY_NAME[pool] + '）');
         burst(window.innerWidth / 2, window.innerHeight / 2, ['🎉', pet.icon, '✨', '💖', '⭐']);
       } else {
         save.stars += 5;
         save.food = (save.food || 0) + 5;
         SFX.badge();
-        toast(pet.icon + ' ' + pet.name + ' 已拥有，转化为 ⭐5 + 🍖5！');
-        TTS.speak(pet.name + '已经在家里啦，送你五颗星星和五份食物！', 0.9);
+        petCry(pet.id); /* 老宠物打招呼 */
+        setTimeout(function () { TTS.speak(pet.name + '已经在家里啦，送你五颗星星和五份食物！', 0.9); }, 350);
+        toast(pet.icon + ' ' + pet.name + '（' + RARITY_NAME[pet.rarity] + '）已拥有，重复转化为 ⭐5 + 🍖5！');
       }
       unlockBadges();
       persist();
@@ -304,8 +420,20 @@
     save = loadSave(); // 回到游客档
     refreshAll();
   }
-  function level() { return Math.floor(save.xp / 100) + 1; }
-  function xpInLevel() { return save.xp % 100; }
+  /* ===== 等级 / 经验（递增曲线，等级上限与成就挂钩）=====
+   * 升到下一级所需经验随等级递增：need(L)=100+(L-1)*40
+   * 累计阈值 xpForLevel(L)=20*(L-1)*(L+3)，即达到 L 级所需的总经验
+   * 等级上限 = 1 + 已解锁成就数（每解锁一个成就多开一级；经验照常累计、永不丢失） */
+  function xpForLevel(L) { return L <= 1 ? 0 : 20 * (L - 1) * (L + 3); }
+  function levelCap() { return 1 + (save.badges ? save.badges.length : 0); }
+  function level() {
+    var cap = levelCap(), L = 1;
+    while (L < cap && xpForLevel(L + 1) <= save.xp) L++;
+    return L;
+  }
+  function xpInLevel() { return save.xp - xpForLevel(level()); }
+  function xpToNext() { return xpForLevel(level() + 1) - xpForLevel(level()); }
+  function xpPct() { var t = xpToNext(); return t > 0 ? Math.min(100, Math.round(xpInLevel() / t * 100)) : 100; }
   /* 出战宠物的结算食物加成：每级 +1 粮 */
   function petFoodBonus() { var p = getActivePet(); return p ? getPetLevel(p.id) : 0; }
 

@@ -67,6 +67,9 @@
   .stats { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
   .stat { display: flex; align-items: center; gap: .25rem; background: #f5f7ff; padding: .32rem .6rem; border-radius: 1.2rem; font-size: .78rem; font-weight: 700; }
   .stat .num { color: var(--primary); font-size: .92rem; }
+  .xp-bar { display: inline-block; width: 3rem; height: .55rem; background: #e2e8f0; border-radius: 1rem; overflow: hidden; vertical-align: middle; flex: none; }
+  .xp-fill { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #34d399, #22c55e); border-radius: 1rem; transition: width .3s; }
+  .xp-stat .num { min-width: 2.6rem; text-align: right; white-space: nowrap; }
   .lv-badge { background: linear-gradient(135deg,#ff9f43,#ff6b6b); color: #fff; border-radius: 1.2rem; padding: .32rem .7rem; font-weight: 800; font-size: .8rem; display: flex; align-items: center; gap: .25rem; box-shadow: 0 4px 12px rgba(255,107,107,.35); }
   .btn { border: none; cursor: pointer; border-radius: .85rem; font-weight: 700; font-family: inherit; transition: transform .1s, box-shadow .2s; display: inline-flex; align-items: center; justify-content: center; gap: .35rem; background: #fff; color: var(--text); }
   .btn:active { transform: scale(.94); }
@@ -385,13 +388,14 @@
   .modal-mask { position: fixed; inset: 0; background: rgba(30,40,80,.5); display: none; align-items: center; justify-content: center; z-index: 200; padding: 1rem; }
   .modal-mask.show { display: flex; }
   .modal { background: #fff; border-radius: var(--radius); padding: 1.2rem; max-width: 34rem; width: 100%; max-height: 82vh; overflow: auto; }
+  .modal-flex.modal { padding: 1rem 1.2rem 1rem; }
   /* 宠物乐园：头/孵化区/关闭按钮固定，仅宠物列表滚动 */
-  .modal-flex { display: flex; flex-direction: column; overflow: hidden; }
+  .modal-flex { display: flex; flex-direction: column; max-height: calc(88vh - 2.4rem); overflow: hidden; }
   .modal-flex h3, .modal-flex .hatch-area, .modal-flex .modal-close { flex-shrink: 0; }
   .modal-flex .pet-grid { flex: 1; min-height: 0; overflow-y: auto; align-content: start; padding: .1rem .25rem .1rem 0; }
   .modal-flex .pet-grid::-webkit-scrollbar { width: .25rem; }
   .modal-flex .pet-grid::-webkit-scrollbar-thumb { background: rgba(79,110,247,.25); border-radius: .2rem; }
-  .modal h3 { font-size: 1.2rem; margin-bottom: .8rem; display: flex; align-items: center; gap: .4rem; }
+  .modal h3 { font-size: 1.15rem; margin-bottom: .5rem; display: flex; align-items: center; gap: .4rem; }
   /* 防沉迷休息弹窗（全屏不透明覆盖，看不到下面内容） */
   .rest-mask { background: #1e2a44; z-index: 1000; }
   .rest-card { background: #fff; border-radius: var(--radius); padding: 2rem 1.8rem 1.6rem; max-width: 26rem; width: 100%; text-align: center; box-shadow: var(--shadow-lg); }
@@ -573,8 +577,12 @@
   .game-item-best { font-size: .7rem; color: var(--primary); font-weight: 700; white-space: nowrap; flex-shrink: 0; }
   .game-item-fav { border: none; background: none; font-size: 1.05rem; cursor: pointer; padding: .1rem .2rem; flex-shrink: 0; font-family: inherit; }
   .hub-empty { text-align: center; color: var(--muted); padding: 2rem 0; }
-  .game-area { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: auto; padding: .4rem .6rem; }
-  .game-area-dom { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .game-area { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: auto; padding: .4rem .6rem; touch-action: none; }
+  .game-area-dom { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: none; }
+  /* 游戏区（含所有子元素）禁止触摸滚动手势：修复手指滑动时舞台上下回弹/抖动。
+   * touch-action 不继承，故用后代通配确保所有 canvas/网格/方块都生效；
+   * 仅禁浏览器默认滚动，不影响点击与游戏自身 touch 事件。 */
+  #gamePlayArea, #gamePlayArea * { touch-action: none; }
   .game-area-dom > :first-child { margin-top: auto; }
   .game-area-dom > :last-child { margin-bottom: auto; }
   .game-canvas { display: block; margin: 0 auto; max-width: 100%; max-height: 100%; border-radius: .6rem; box-shadow: var(--shadow); }
@@ -583,8 +591,8 @@
   .game-ctrl .btn:active { transform: translateY(1px) scale(.97); box-shadow: 0 1px 3px rgba(79,110,247,.2); }
   .game-ctrl .btn:disabled { opacity: .45; }
   /* 特效：得分飘字 + 粒子爆炸 */
-  .game-float { position: absolute; font-size: 1.15rem; font-weight: 900; color: #f59e0b; text-shadow: 0 1px 4px rgba(0,0,0,.18); pointer-events: none; z-index: 6; white-space: nowrap; animation: gFloatUp .9s ease-out forwards; }
-  @keyframes gFloatUp { 0% { transform: translateY(0) scale(.7); opacity: 0; } 25% { opacity: 1; transform: translateY(-8px) scale(1.08); } 100% { transform: translateY(-56px) scale(1); opacity: 0; } }
+  .game-float { position: absolute; font-size: 1.15rem; font-weight: 900; color: #f59e0b; text-shadow: 0 1px 4px rgba(0,0,0,.18); pointer-events: none; z-index: 6; white-space: nowrap; animation: gFloatUp 1.8s ease-out forwards; }
+  @keyframes gFloatUp { 0% { transform: translateY(0) scale(.7); opacity: 0; } 20% { opacity: 1; transform: translateY(-8px) scale(1.08); } 75% { opacity: 1; transform: translateY(-48px) scale(1); } 100% { transform: translateY(-64px) scale(1); opacity: 0; } }
   .game-particle { position: absolute; width: 8px; height: 8px; border-radius: 50%; pointer-events: none; z-index: 6; animation: gBurst .6s ease-out forwards; }
   @keyframes gBurst { 0% { transform: translate(0,0) scale(1); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(.25); opacity: 0; } }
   /* 通用网格按钮（棋盘类游戏共用） */
@@ -597,6 +605,10 @@
   .go-cell { border: .05rem solid #dbe4ff; background: #f7f8ff; border-radius: .2rem; aspect-ratio: 1; font-size: .72rem; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; padding: 0; }
   .rv-grid { grid-template-columns: repeat(8, 2.5rem); }
   .rv-cell { height: 2.5rem; background: #eaf7ee; border: .08rem solid #2f7d4f; border-radius: .2rem; cursor: pointer; font-size: 1rem; font-family: inherit; }
+  /* 合法落子点高亮（解决"点格子没反应/不知怎么玩"）：绿色底 + 中心圆点提示 */
+  .rv-cell.rv-legal { background: #bfe9cc; box-shadow: inset 0 0 0 .1rem #2f7d4f; }
+  .rv-cell.rv-legal:active { transform: scale(.92); }
+  .rv-dot { display: block; width: .7rem; height: .7rem; border-radius: 50%; background: #2f7d4f; opacity: .55; margin: 0 auto; }
   .mem-grid { grid-template-columns: repeat(4, 3.6rem); }
   .mem-cell { height: 3.6rem; font-size: 1.6rem; transition: background .15s; }
   .mem-cell.up { background: #fff; animation: memFlip .22s ease-out; }
@@ -683,7 +695,7 @@
   /* 宠物互动蹦跳动画 */
   @keyframes petHop { 0%,100% { transform: translateY(0); } 30% { transform: translateY(-.45rem) scale(1.07); } 60% { transform: translateY(0); } 80% { transform: translateY(-.18rem); } }
   .pet-card.hop { animation: petHop .55s; }
-  .modal-close { margin-top: 1rem; width: 100%; padding: .75rem; }
+  .modal-close { margin-top: .5rem; width: 100%; padding: .55rem; }
 
   /* ===== 提示/特效 ===== */
   .toast { position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); background: #fff; border-radius: 1rem; box-shadow: 0 10px 34px rgba(0,0,0,.2); padding: .7rem 1.2rem; font-weight: 800; z-index: 1200; display: none; align-items: center; gap: .45rem; font-size: .95rem; white-space: nowrap; }
@@ -751,25 +763,30 @@
 
   /* ===== 宠物乐园 ===== */
   .pet-btn { width: auto; min-width: 2.4rem; padding: 0 .55rem; font-size: .95rem; }
-  .hatch-area { text-align: center; padding: .8rem; background: linear-gradient(135deg, #fff8ec, #ffeef5); border-radius: 1rem; margin-bottom: .8rem; }
-  .hatch-area .egg-icon { font-size: 2.6rem; display: inline-block; animation: bob 2s ease-in-out infinite; }
+  .hatch-area { text-align: center; padding: .45rem .55rem .55rem; background: linear-gradient(135deg, #fff8ec, #ffeef5); border-radius: .9rem; margin-bottom: .5rem; }
+  .hatch-area .egg-icon { font-size: 1.9rem; display: inline-block; animation: bob 2s ease-in-out infinite; line-height: 1; margin: .1rem 0; }
   .hatch-area .egg-icon.shaking { animation: eggShake .35s ease-in-out infinite; }
   @keyframes eggShake { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-14deg) scale(1.05); } 75% { transform: rotate(14deg) scale(1.05); } }
-  .hatch-tip { font-size: .75rem; color: var(--muted); margin: .3rem 0 .55rem; }
-  .food-balance { display: inline-block; background: #fff4e6; color: #e67e22; border-radius: .8rem; padding: .3rem .8rem; font-size: .85rem; font-weight: 800; margin-bottom: .4rem; }
-  .hatch-btn { padding: .6rem 1.8rem; }
-  .pet-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; }
-  @media (max-width: 420px) { .pet-grid { grid-template-columns: repeat(3, 1fr); } }
-  .pet-card { background: #f5f7ff; border-radius: .8rem; padding: .6rem .3rem; text-align: center; }
-  .pet-card .pi { font-size: 1.7rem; }
-  .pet-card .pn { font-size: .68rem; font-weight: 700; margin-top: .15rem; }
-  .pet-card.locked { opacity: .4; filter: grayscale(1); }
+  .hatch-tip { font-size: .68rem; color: var(--muted); margin: .15rem 0 .35rem; line-height: 1.3; }
+  .food-balance { display: inline-block; background: #fff4e6; color: #e67e22; border-radius: .8rem; padding: .2rem .65rem; font-size: .78rem; font-weight: 800; margin-bottom: .25rem; }
+  .hatch-btn { padding: .45rem 1.4rem; font-size: .9rem; }
+  .pet-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: .35rem; }
+  @media (max-width: 420px) { .pet-grid { grid-template-columns: repeat(4, 1fr); } }
+  .pet-card { background: #f5f7ff; border-radius: .7rem; padding: .35rem .15rem; text-align: center; position: relative; }
+  .pet-card .pi { font-size: 1.6rem; line-height: 1; }
+  .pet-card .pn { font-size: .62rem; font-weight: 700; margin-top: .1rem; }
+  .pet-card.locked { opacity: .42; filter: grayscale(1); }
   .pet-card.r-rare { background: linear-gradient(135deg, #e0f7ff, #e6e0ff); box-shadow: 0 0 0 .14rem rgba(79,110,247,.35); }
   .pet-card.r-legend { background: linear-gradient(135deg, #fff3cd, #ffe0b2); box-shadow: 0 0 0 .14rem rgba(247,183,49,.55); }
   .pet-card.active { box-shadow: 0 0 0 .2rem var(--gold); }
-  .pet-card .active-mark { position: absolute; top: .1rem; right: .2rem; font-size: .62rem; font-weight: 800; color: var(--gold); }
-  .pet-card.clickable { cursor: pointer; transition: transform .12s; position: relative; }
+  .pet-card .active-mark { position: absolute; top: .05rem; right: .1rem; font-size: .55rem; font-weight: 800; color: var(--gold); line-height: 1; }
+  .pet-card.clickable { cursor: pointer; transition: transform .12s; }
   .pet-card.clickable:hover { transform: translateY(-.12rem); }
+  /* 稀有度文字标签：普通 / 稀有 / 传说，用文字明确标识，体现等级感 */
+  .r-tag { display: inline-block; font-size: .56rem; font-weight: 800; padding: .04rem .34rem; border-radius: .5rem; margin-top: .12rem; line-height: 1.2; }
+  .r-tag.r-common { background: #eef1f6; color: #6b7280; }
+  .r-tag.r-rare { background: #e6ecff; color: #3b5bdb; }
+  .r-tag.r-legend { background: linear-gradient(135deg, #ffe08a, #ffb347); color: #7a4b00; }
 
   /* ===== 出战宠物（战斗助威） ===== */
   .pet-side { display: flex; flex-direction: column; align-items: center; font-size: 1.35rem; line-height: 1; animation: bob 1.8s ease-in-out infinite; }
@@ -850,11 +867,11 @@
   .fold-canvas { width: 15.5rem; height: 12rem; display: block; margin: 0 auto; }
 
   /* ===== 宠物喂食栏 ===== */
-  .active-pet-bar { display: none; align-items: center; gap: .55rem; background: rgba(255,255,255,.85); border-radius: .9rem; padding: .5rem .7rem; margin-bottom: .6rem; }
-  .active-pet-bar .ap-icon { font-size: 1.7rem; }
-  .active-pet-bar .ap-info { flex: 1; text-align: left; font-size: .9rem; line-height: 1.3; }
-  .active-pet-bar .ap-info small { display: block; color: var(--muted); font-size: .7rem; }
-  .feed-btn { padding: .45rem .9rem; font-size: .85rem; }
+  .active-pet-bar { display: none; align-items: center; gap: .5rem; background: rgba(255,255,255,.85); border-radius: .8rem; padding: .4rem .55rem; margin-bottom: .35rem; }
+  .active-pet-bar .ap-icon { font-size: 1.4rem; }
+  .active-pet-bar .ap-info { flex: 1; text-align: left; font-size: .82rem; line-height: 1.25; }
+  .active-pet-bar .ap-info small { display: block; color: var(--muted); font-size: .65rem; }
+  .feed-btn { padding: .35rem .7rem; font-size: .78rem; flex: 0 0 auto; margin-left: .2rem; }
 
   /* ===== 错题本 ===== */
   .wrong-list { max-height: 46vh; overflow: auto; text-align: left; }
@@ -910,8 +927,9 @@
   body.frame-fire #userBtn { border: .2rem solid #ef4444; box-shadow: 0 0 .6rem rgba(239,68,68,.55); }
   body.frame-diamond #userBtn { border: .2rem solid #38bdf8; box-shadow: 0 0 .6rem rgba(56,189,248,.6); }
 
-  /* ===== 宠物帽子装扮 ===== */
-  .pet-hat { font-size: .6em; vertical-align: super; margin-left: -.4em; display: inline-block; }
+  /* ===== 宠物帽子装扮（戴在头顶中央，不再用上标跑到脚下） ===== */
+  .pet-figure { position: relative; display: inline-block; line-height: 1; }
+  .pet-hat { position: absolute; top: -.42em; left: 50%; transform: translateX(-50%); font-size: .5em; line-height: 1; }
 
   /* ===== 积分商店 ===== */
   .shop-list { flex: 1; min-height: 0; overflow-y: auto; }

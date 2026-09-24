@@ -113,9 +113,50 @@
     if (/^g[1-9]$/.test(p[0] || '')) curGrade = parseInt(p[0].slice(1), 10);
     goHomeView();
   }
+  /* 系统返回键（手机物理返回/浏览器手势返回）会触发 hashchange。若此时有弹窗打开，
+     应优先关闭弹窗而非切换底层路由，否则会出现“弹窗没关、下面内容却被返回操作”的问题 */
+  function tryCloseTopModal() {
+    var list = [
+      ['puppetModal', closePuppet],
+      ['chapterModal', closeChapter],
+      ['pinyinModal', closePinyin],
+      ['phonicsModal', closePhoDetail],
+      ['storyModal', closeStory],
+      ['grammarModal', closeGrammarDetail],
+      ['badgeModal', closeBadge],
+      ['petModal', closePetModal],
+      ['shopModal', null],
+      ['userModal', null],
+      ['wrongModal', null],
+      ['signModal', null],
+      ['backupModal', null]
+    ];
+    for (var i = 0; i < list.length; i++) {
+      var el = $(list[i][0]);
+      if (el && el.classList.contains('show')) {
+        if (typeof list[i][1] === 'function') list[i][1]();
+        else el.className = 'modal-mask';
+        return true;
+      }
+    }
+    return false;
+  }
   window.addEventListener('hashchange', function () {
     var h = (location.hash || '').replace(/^#\/?/, '');
     if (h === appHash) return; // 程序内部设置的不处理，避免循环
+    // 防沉迷强制休息 / 家长验证 / 家长设置：系统返回键无效（需密码退出），退回原路由不做切换
+    if (($('restModal') && $('restModal').classList.contains('show')) ||
+        ($('pwdModal') && $('pwdModal').classList.contains('show')) ||
+        ($('parentModal') && $('parentModal').classList.contains('show'))) {
+      try { history.replaceState(history.state, '', '#/' + appHash); } catch (e) {}
+      return;
+    }
+    // 有弹窗：关闭最上层弹窗，并把 hash 恢复回弹窗打开前的稳定状态
+    // （replaceState 不会触发 hashchange，避免在关闭弹窗的同时又切换底层路由）
+    if (tryCloseTopModal()) {
+      try { history.replaceState(history.state, '', '#/' + appHash); } catch (e) {}
+      return;
+    }
     SFX.click();
     applyHash();
   });

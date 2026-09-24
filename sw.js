@@ -1,6 +1,6 @@
 /* ===================== Service Worker（离线缓存，移动端更接近原生应用） =====================
  * 缓存优先 + 运行时动态缓存：首次访问缓存核心文件，后续资源按需缓存，离线也能玩 */
-var CACHE = 'study-game-v5';
+var CACHE = 'study-game-v19';
 
 self.addEventListener('install', function (e) {
   self.skipWaiting(); // 新版本立即激活，免去 waiting 期，缓存策略改动即时生效
@@ -77,6 +77,7 @@ self.addEventListener('install', function (e) {
         './js/games/04-react.js',
         './js/games/05-path.js',
         './js/games/06-observe.js',
+        './js/games/07-xiangqi.js',
         './js/18-shop.js'
       ]);
     })

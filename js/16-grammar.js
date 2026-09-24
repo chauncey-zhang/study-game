@@ -218,7 +218,13 @@ function answerGrammarQuizQ(oi) {
     if (bi === ans) b.classList.add('correct');
     if (bi === oi && !isCorrect) b.classList.add('wrong');
   });
-  if (isCorrect) { q.correct++; SFX.correct(); } else { q.wrong.push(it.g.title); SFX.wrong(); }
+  if (isCorrect) { q.correct++; SFX.correct(); }
+  else {
+    q.wrong.push(it.g.title);
+    addToWrongBook('英语', curGrade, it.q); // 错题入错题本（按题干去重，上限 50）
+    persist();
+    SFX.wrong();
+  }
   var fb = $('grQFb');
   if (fb) {
     fb.innerHTML = (isCorrect ? '✅ 答对了！' : '❌ 正确答案是 ' + it.q.o[ans]) +
@@ -274,10 +280,11 @@ $('grFav').addEventListener('click', function () {
 $('grTrainBtn').addEventListener('click', function () {
   SFX.click();
   if (!grammarCurrent) return;
+  var trainId = grammarCurrent.id; // 先捕获，closeGrammarDetail 会把 grammarCurrent 置空
   closeGrammarDetail();
   grammarTab = 'quiz';
   renderGrammarTabs();
-  startGrammarQuiz(grammarCurrent.id);
+  startGrammarQuiz(trainId);
 });
 $('grMnSay').addEventListener('click', function () {
   if (!grammarCurrent) return;

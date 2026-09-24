@@ -103,8 +103,9 @@
         try { localStorage.setItem(CURRENT_KEY, payload.currentUser); } catch (e) {}
       }
       persist();
-      /* 恢复成功后立即同步一次备份（写入备份槽 + 今日快照），形成闭环 */
-      try { if (window.__BACKUP__) window.__BACKUP__.syncNow(); } catch (e) {}
+      /* 恢复成功后立即同步一次备份（写入备份槽 + 今日快照），形成闭环；
+         传 true 表示不自动下载文件——刚导入的备份就是恢复源，无需再下一份 */
+      try { if (window.__BACKUP__) window.__BACKUP__.syncNow(true); } catch (e) {}
       refreshAll();
       SFX.levelup();
       toast('✅ 恢复成功！' + (payload.user && payload.user !== '游客' ? '用户：' + payload.user : ''));

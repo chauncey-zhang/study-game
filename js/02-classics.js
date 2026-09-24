@@ -253,19 +253,28 @@
       f.style.animationDelay = (0.15 + k * 0.12) + 's';
       castEl.appendChild(f);
     });
-    var marqSecs = Math.max(9, Math.round(sc.line.length * 0.7));
+    /* 场景停留节奏由“朗读时长”驱动，而非字幕滚动时长：
+       原逻辑用 marqSecs(>=9s) 作切换延时，朗读早已结束却要干等字幕滚完才切下一幕，
+       中间出现空白停顿。改为按文本长度估算朗读秒数作字幕时长，并由 TTS 朗读结束回调精确切幕 */
+    var marqSecs = Math.max(2.5, Math.round(sc.line.length * 0.32));
     $('ppSub').innerHTML = '<span class="pp-marquee" style="animation-duration:' + marqSecs + 's">🎬 第 <b>' + (st.idx + 1) + ' / ' + st.scenes.length + '</b> 幕 ｜ ' + sc.line + '</span>';
-    if (st.sound) TTS.speak(sc.line, 0.95, 1.2);
     var rect = $('puppetStage').getBoundingClientRect();
     if (sc.act === 'fight') burst(rect.left + rect.width / 2, rect.top + rect.height / 2, ['💥', '⚡']);
     else if (sc.act === 'fire') burst(rect.left + rect.width / 2, rect.top + rect.height / 2, ['🔥', '✨']);
     else if (sc.act === 'happy') burst(rect.left + rect.width / 2, rect.top + rect.height / 2, ['✨', '🎉']);
     clearTimeout(st.timer);
-    if (st.auto) {
-      st.timer = setTimeout(function () {
-        if (st.idx >= st.scenes.length - 1) { ppEnd(); return; }
-        ppShowScene(st.idx + 1);
-      }, marqSecs * 1000 + 500);
+    function ppGoNext() {
+      if (!ppState || ppState !== st) return; // 已切换/关闭则作废，防止过期回调误切
+      if (st.idx >= st.scenes.length - 1) { ppEnd(); return; }
+      ppShowScene(st.idx + 1);
+    }
+    if (st.auto) st.timer = setTimeout(ppGoNext, marqSecs * 1000 + 600); // 字幕兜底：朗读结束回调未触发时按字幕时长切
+    if (st.sound && TTS.enabled) {
+      // 朗读结束立即（留 0.8s 余量）切下一幕；全局语音关闭时 TTS 不发声，仅走字幕兜底
+      TTS.speak(sc.line, 0.95, 1.2, st.auto ? function () {
+        clearTimeout(st.timer);
+        st.timer = setTimeout(ppGoNext, 800);
+      } : null);
     }
   }
   function ppEnd() {
@@ -464,6 +473,48 @@
   var TTS = {
     enabled: (typeof speechSynthesis !== 'undefined' && typeof SpeechSynthesisUtterance !== 'undefined'),
     _token: 0, /* 朗读令牌：新朗读/停止会使旧的回调作废，防止串音与误复位 */
+    _voices: null, /* 语音列表缓存：getVoices 异步加载，用 onvoiceschanged 刷新 */
+    /* 朗读时让全局背景乐让位：部分内核上 Web Audio（背景乐振荡器）持续播放会抢占音频焦点，
+       导致 speechSynthesis 偶发被静默丢弃（表现为"背景乐开着时点播放题目没反应"），
+       故朗读开始让背景乐静音让位、朗读结束再恢复 */
+    _duckedByTTS: false,
+    _duckMusic: function () {
+      if (this._duckedByTTS) return;
+      if (musicOn && musicTimer) { // 仅在背景乐确实在播放时让位（剧场/休息已让位则不再重复处理）
+        clearTimeout(musicTimer); musicTimer = null;
+        if (musicGain) musicGain.gain.value = 0;
+        this._duckedByTTS = true;
+      }
+    },
+    _restoreMusic: function () {
+      if (!this._duckedByTTS) return;
+      this._duckedByTTS = false;
+      if (musicOn && !ppState) { // 剧场/休息让位期间不抢回背景乐
+        if (ensureMusic()) {
+          if (musicGain) musicGain.gain.value = 0.05;
+          if (!musicTimer) scheduleBar();
+        }
+      }
+    },
+    /* 获取并缓存语音列表；getVoices 是异步加载的，需配合 onvoiceschanged 刷新 */
+    _getVoices: function () {
+      try {
+        if (this._voices && this._voices.length) return this._voices;
+        var vs = speechSynthesis.getVoices() || [];
+        if (vs.length) this._voices = vs;
+        return vs;
+      } catch (e) { return []; }
+    },
+    /* 口语化预处理：去除会被误读或卡顿的 emoji/装饰符号，压缩空白，
+       英文句末标点后补空格帮助英文语音正确断句，让朗读更干净自然 */
+    _clean: function (text) {
+      var s = String(text);
+      s = s.replace(/[\uD83C-\uD83F][\uDC00-\uDFFF]/g, ''); // 主要 emoji（代理对）
+      s = s.replace(/[\u2600-\u27BF\u2B00-\u2BFF\uFE0F\u200D\u2190-\u21FF\u2300-\u23FF]/g, ''); // 符号/箭头/变体选择符/零宽连接符
+      s = s.replace(/\s+/g, ' ');
+      s = s.replace(/([.!?;:])(?=[A-Za-z])/g, '$1 '); // 英文句末标点后补空格
+      return s;
+    },
     /* Chrome 的 cancel() 与 speak() 有竞态 bug（紧跟调用会被 interrupted 吞掉），需延迟重发；
        长文本一次朗读在部分内核会静默失败，故分句切块排队朗读 */
     speak: function (text, rate, pitch, onEnd) {
@@ -471,8 +522,9 @@
       var self = this;
       var myToken = ++this._token;
       try { speechSynthesis.cancel(); } catch (e) {}
+      self._duckMusic(); // 朗读开始：背景乐让位，避免与 speechSynthesis 争抢音频焦点
       /* 分句切块：遇句号/问号等且已积攒 40 字以上就切一段 */
-      var s = String(text), chunks = [], buf = '', i, ch;
+      var s = self._clean(text), chunks = [], buf = '', i, ch;
       for (i = 0; i < s.length; i++) {
         ch = s.charAt(i); buf += ch;
         if ('。！？；\n'.indexOf(ch) !== -1 && buf.length >= 40) { chunks.push(buf); buf = ''; }
@@ -481,14 +533,19 @@
         if (chunks.length && buf.length < 20) chunks[chunks.length - 1] += buf;
         else chunks.push(buf);
       }
+      /* 语速/音调收敛到自然区间：过高会尖细机械，过慢会拖沓生硬 */
+      var r = rate || 0.88;
+      if (r > 1.3) r = 1.3; else if (r < 0.6) r = 0.65;
+      var p = pitch || 1.0;
+      if (p > 1.25) p = 1.22; else if (p < 0.75) p = 0.8;
       var retried0 = false;
       function playChunk(k) {
         if (self._token !== myToken) return; // 已被新朗读/停止取代
-        if (k >= chunks.length) { if (onEnd) try { onEnd(); } catch (e) {} return; }
+        if (k >= chunks.length) { self._restoreMusic(); if (onEnd) try { onEnd(); } catch (e) {} return; }
         var u = new SpeechSynthesisUtterance(chunks[k]);
         u.lang = 'zh-CN';
-        u.rate = rate || 0.85;   // 放慢语速，适合低年级
-        u.pitch = pitch || 1.1;  // 稍高音调，更像老师引导
+        u.rate = r;   // 放慢语速，适合低年级
+        u.pitch = p;  // 自然音调，不过高尖细
         var v = self.zhVoice();
         if (v) u.voice = v;
         u.onend = function () { if (self._token === myToken) playChunk(k + 1); };
@@ -506,39 +563,71 @@
       setTimeout(function () { playChunk(0); }, 150);
       return true;
     },
-    /* 优先选中文发音，部分内核不选 voice 会静音 */
+    /* 优先选自然度高的中文语音：在线自然语音（晓晓/云希等 Azure Neural）> 本地优质语音（慧慧/瑶瑶等）。
+       部分内核不选 voice 会静音，故尽量返回可用 voice */
     zhVoice: function () {
       try {
-        var vs = speechSynthesis.getVoices() || [];
-        for (var i = 0; i < vs.length; i++) {
-          if (/^zh([-_]|$)/i.test(vs[i].lang) || /Chinese|中文|Huihui|Yaoyao|Tingting|Xiaoxiao/i.test(vs[i].name)) return vs[i];
+        var vs = this._getVoices();
+        var best = null, bestScore = -1, i, v, lang, name, score;
+        for (i = 0; i < vs.length; i++) {
+          v = vs[i];
+          lang = (v.lang || '').toLowerCase();
+          if (!/^zh/.test(lang) && !/^cmn/.test(lang)) continue; // 只认普通话/中文
+          name = v.name || '';
+          score = 0;
+          if (/natural/i.test(name)) score += 100;                    // 在线自然语音
+          if (/xiaoxiao|xiaoyi|xiaohan|xiaomo|xiaoshuang|xiaoxuan|xiaozhen|xiaoyan|xiaorui|xiaomeng|xiaochen|yunxi|yunjian|yunyang|yunxia|yunye|yunhao/i.test(name)) score += 90; // 微软自然语音名
+          else if (/huihui|yaoyao|kangkang|tingting|meijia|lili|sinji/i.test(name)) score += 50; // 本地常见中文语音
+          if (/microsoft/i.test(name) && /online/i.test(name)) score += 60; // 微软在线语音
+          if (v.localService) score += 25;                            // 本地语音更稳定
+          if (/zh-cn|cmn-cn|zh-hans/i.test(lang)) score += 12;        // 简体普通话优先
+          if (v.default) score += 3;
+          if (score > bestScore) { bestScore = score; best = v; }
         }
+        return best;
       } catch (e) {}
       return null;
     },
-    /* 优先选英文发音（en-US 优先） */
+    /* 优先选英文发音（en-US 优先，自然语音优先） */
     enVoice: function () {
       try {
-        var vs = speechSynthesis.getVoices() || [];
-        for (var i = 0; i < vs.length; i++) {
-          if (/^en([-_]|$)/i.test(vs[i].lang)) return vs[i];
+        var vs = this._getVoices();
+        var best = null, bestScore = -1, i, v, lang, name, score;
+        for (i = 0; i < vs.length; i++) {
+          v = vs[i];
+          lang = (v.lang || '').toLowerCase();
+          if (!/^en/.test(lang)) continue;
+          name = v.name || '';
+          score = 0;
+          if (/natural/i.test(name)) score += 100;
+          if (/aria|jenny|guy|ana|susan|samantha|alex|daniel|karen|moira|tessa|zira|david|mark|ava|allison/i.test(name)) score += 40; // 常见高质量英文语音
+          if (/en-us/i.test(lang)) score += 20;
+          if (v.localService) score += 10;
+          if (v.default) score += 3;
+          if (score > bestScore) { bestScore = score; best = v; }
         }
+        return best;
       } catch (e) {}
       return null;
     },
-    stop: function () { this._token++; if (this.enabled) { try { speechSynthesis.cancel(); } catch (e) {} } },
+    stop: function () { this._token++; this._restoreMusic(); if (this.enabled) { try { speechSynthesis.cancel(); } catch (e) {} } },
     /* 英文单词读音（en-US，慢速） */
     speakEn: function (text) {
       if (!this.enabled || !text) return;
+      var self = this;
       this._token++;
+      this._duckMusic(); // 朗读开始：背景乐让位
       try {
         speechSynthesis.cancel();
-        var u = new SpeechSynthesisUtterance(String(text));
+        var u = new SpeechSynthesisUtterance(self._clean(text));
         u.lang = 'en-US';
         u.rate = 0.7;
         u.pitch = 1;
+        var v = self.enVoice();
+        if (v) u.voice = v; // 指定英文语音，避免用默认中文语音读英文单词导致生硬
+        u.onend = function () { self._restoreMusic(); }; // 英文单词读完恢复背景乐
         speechSynthesis.speak(u);
-      } catch (e) {}
+      } catch (e) { this._restoreMusic(); }
     },
     /* 故事朗读（舒缓模式）：更慢语速 + 柔和低音调 + 逐句停顿，
      * 让声音娓娓道来、更有睡前故事的情感节奏（与答题/提示的普通朗读区分）
@@ -548,10 +637,11 @@
       var self = this;
       var myToken = ++this._token;
       try { speechSynthesis.cancel(); } catch (e) {}
+      self._duckMusic(); // 朗读开始：背景乐让位
       var isEn = lang === 'en-US';
       /* 按句切分：每句独立成段，句间停顿，形成舒缓的朗读节奏（中英文句读符号不同） */
       var stops = isEn ? '.!?;\n' : '。！？；\n';
-      var s = String(text), chunks = [], buf = '', i, ch;
+      var s = self._clean(text), chunks = [], buf = '', i, ch;
       for (i = 0; i < s.length; i++) {
         ch = s.charAt(i); buf += ch;
         if (stops.indexOf(ch) !== -1) {
@@ -567,7 +657,7 @@
       var retried0 = false;
       function playChunk(k) {
         if (self._token !== myToken) return;
-        if (k >= chunks.length) { if (onEnd) try { onEnd(); } catch (e) {} return; }
+        if (k >= chunks.length) { self._restoreMusic(); if (onEnd) try { onEnd(); } catch (e) {} return; }
         var u = new SpeechSynthesisUtterance(chunks[k]);
         u.lang = isEn ? 'en-US' : 'zh-CN';
         u.rate = RATE;
@@ -592,10 +682,20 @@
       return true;
     }
   };
-  if (TTS.enabled) { try { speechSynthesis.getVoices(); } catch (e) {} } /* 预热：促使内核尽早加载语音列表 */
+  if (TTS.enabled) { /* 预热语音列表：getVoices 异步，需监听 voiceschanged 在加载完成后刷新缓存 */
+    try { TTS._voices = speechSynthesis.getVoices() || []; } catch (e) {}
+    try {
+      speechSynthesis.onvoiceschanged = function () {
+        try { TTS._voices = speechSynthesis.getVoices() || []; } catch (e2) {}
+      };
+    } catch (e) {}
+  }
   var PRAISE = ['答对啦，真棒！', '太厉害了！', '你真聪明！', '哇，好厉害，继续加油！', '完全正确！'];
   var CHEER = ['没关系，再想想哦！', '加油，你可以的！', '差一点点，下次一定行！', '别灰心，继续努力！'];
   function speakQuestion(q) {
+    /* 图形类题目（optHtml 为 true）的选项是 HTML 片段，无法朗读，
+       拼进语音会把 HTML 代码读出来；此类只朗读题干，提示看图形选项 */
+    if (q.optHtml) { TTS.speak(q.q + '。请观察下面的图形选项。', 0.85); return; }
     TTS.speak(q.q + '。选项：' + q.o.join('，') + '。', 0.85);
   }
 
@@ -624,6 +724,8 @@
   }
   function scheduleBar() {
     if (!musicOn || !musicGain) { musicTimer = null; return; }
+    if (typeof antiResting !== 'undefined' && antiResting) { musicTimer = null; return; } // 防沉迷休息期间不排程全局乐
+    if (typeof ppState !== 'undefined' && ppState) { musicTimer = null; return; } // 皮影戏让位期间不抢全局乐
     musicTimer = setTimeout(scheduleBar, MELODY.length * BEAT * 1000 - 120); // 先续链，音符调度异常也不会断
     try {
       var t0 = audioCtx.currentTime + 0.05;
@@ -666,15 +768,28 @@
   }
   /* 音乐看门狗：旋律链因异常/浏览器挂起断掉时，自动续上 */
   setInterval(function () {
+    if (document.hidden) return; // 后台不续链，避免挂起后复活背景乐在后台播放
     if (!musicOn || ppState) return; // 剧场让位期间不抢
+    if (typeof antiResting !== 'undefined' && antiResting) return; // 防沉迷休息期间全局乐让位，只放休息乐
     if (!ensureMusic()) return;
     try { if (audioCtx.state === 'suspended') audioCtx.resume(); } catch (e) {}
     if (!musicTimer) scheduleBar();
   }, 8000);
+  /* 切后台/回前台时管控 Web Audio：移动端浏览器切到后台不会自动暂停音频上下文，
+     导致背景乐（乃至皮影/休息配乐）在后台持续播放；故隐藏时挂起 audioCtx 并停掉所有
+     音频链，回到前台再恢复对应模块的声音 */
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden && musicOn && !ppState) {
-      ensureAudio();
-      if (ensureMusic() && !musicTimer) scheduleBar();
+    if (document.hidden) {
+      clearTimeout(musicTimer); musicTimer = null;
+      if (typeof ppMusicStop === 'function') ppMusicStop();
+      if (typeof antiRestMusicStop === 'function') antiRestMusicStop();
+      if (audioCtx && audioCtx.state === 'running') { try { audioCtx.suspend(); } catch (e) {} }
+    } else {
+      if (audioCtx && audioCtx.state === 'suspended') { try { audioCtx.resume(); } catch (e) {} }
+      if (TTS && TTS._duckedByTTS) { try { TTS._restoreMusic(); } catch (e) {} } // 防止朗读让位残留导致增益卡 0
+      if (ppState) { if (typeof ppMusicStart === 'function') ppMusicStart(); return; } // 皮影戏让位期间不抢全局背景乐
+      if (typeof antiResting !== 'undefined' && antiResting) { if (typeof antiRestMusicStart === 'function') antiRestMusicStart(); return; }
+      if (musicOn && !musicTimer) { ensureAudio(); if (ensureMusic()) scheduleBar(); }
     }
   });
 

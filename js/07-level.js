@@ -11,7 +11,11 @@
   // 选项每次洗牌（题干固定 → 关卡结构稳定，又防止背选项位置）
   function shuffleOptions(q) {
     var idx = shuffle([0, 1, 2, 3].slice(0, q.o.length));
-    return { q: q.q, o: idx.map(function (i) { return q.o[i]; }), a: idx.indexOf(q.a), e: q.e, g: q.g };
+    var r = {};
+    for (var k in q) { if (q.hasOwnProperty(k)) r[k] = q[k]; } // 保留 m / ipa / key 等全部字段
+    r.o = idx.map(function (i) { return q.o[i]; });
+    r.a = idx.indexOf(q.a);
+    return r;
   }
   function getLevelQuestions(subjectId, grade, lv) {
     var start = lv * QUESTIONS_PER_LEVEL;
@@ -86,6 +90,7 @@
     renderModeBar();
   }
   function goMap() {
+    TTS.stop(); // 退出战斗时停止题目朗读，避免返回后语音仍在播放
     SFX.click();
     if (libWordMode) { showWordLib(); return; }
     if (freeMode) {
@@ -169,6 +174,10 @@
     renderDots();
     if (curIndex >= curQuestions.length) { finishBattle(); return; }
     var q = curQuestions[curIndex];
+    /* 错题重练：按当前题自身记录的玩法模式渲染（拼写/判断/口算/选择），
+       否则会沿用上一局的 gameMode，导致非拼写题被误当拼写渲染、关键字（引号内容）丢失。
+       仅错题重练（wrongMode）时恢复，避免影响正常闯关（闯关题无 m 字段） */
+    if (wrongMode && q && q.m) gameMode = q.m;
     var isBoss = (curIndex === curQuestions.length - 1);
     var mon = $('monsterEmoji');
     mon.textContent = isBoss ? '👹' : '👾';
@@ -207,7 +216,7 @@
       var mm = q.q.match(/“(.+)”/);
       spellCn = mm ? mm[1] : '';
       $('qText').textContent = (isBoss ? '👑 BOSS战！' : '') + '拼写出 “' + spellCn + '” 的英文单词';
-      if (libWordMode && q.ipa) {
+      if (q.ipa) {
         ad.className = 'answer-display';
         ad.innerHTML = '<span class="ipa-tag">/' + q.ipa + '/</span>' + (q.key ? '<span class="key-tag">⭐重点</span>' : '') +
           ' <span class="mental-val" id="spellVal">_</span>';
@@ -237,6 +246,7 @@
     // 低年级（1-2年级）自动朗读题目（口算/拼写只读题干，避免泄露选项）
     if (curGrade <= 2) {
       setTimeout(function () {
+        if ($('battleScreen').classList.contains('hidden')) return; // 已返回/退出则不再朗读
         if (gameMode === 'mental' || gameMode === 'spelling') TTS.speak(q.q, 0.85);
         else speakQuestion(q);
       }, 400);
@@ -378,7 +388,7 @@
       correctCount++;
       var gain = Math.round(10 * (1 + (combo - 1) * 0.1)) + (isBoss ? 10 : 0) + speedBonus;
       var myPet = getActivePet();
-      if (myPet) gain = Math.round(gain * (1 + (getPetLevel(myPet.id) - 1) * 0.05));
+      if (myPet) gain = Math.round(gain * (1 + petXpBonus() / 100));
       earnedXp += gain;
       monsterHp = Math.max(0, monsterHp - 1);
       SFX.correct();
@@ -405,7 +415,7 @@
       shakeScreen();
       showDmg($('heroEmoji'), '-1❤', false);
       battleWrongIdx.push(curIndex);
-      if (!wrongMode && curSubject) addToWrongBook(curSubject, curGrade, q);
+      if (!wrongMode && curSubject) addToWrongBook(curSubject, curGrade, q, gameMode);
       var bpe = $('battlePet');
       if (bpe && bpe.style.display !== 'none') {
         bpe.classList.add('encourage');
@@ -434,6 +444,7 @@
     $('nextBtn').textContent = (curIndex + 1 >= curQuestions.length || hp <= 0) ? '查看结果 🏁' : '下一题 ➜';
     updateTopbar();
     setTimeout(function () {
+      if ($('battleScreen').classList.contains('hidden')) return; // 已返回/退出则不再朗读反馈
       var say = isCorrect
         ? PRAISE[Math.floor(Math.random() * PRAISE.length)]
         : CHEER[Math.floor(Math.random() * CHEER.length)];
@@ -520,7 +531,11 @@
     wrongMode = false;
     persist();
     updateTopbar();
-    if (level() > oldLevel) { SFX.levelup(); toast('🎉 升级啦！现在是 Lv.' + level()); }
+    var newLv = level();
+    if (newLv > oldLevel) {
+      SFX.levelup();
+      toast(newLv >= levelCap() ? ('🎉 升级到 Lv.' + newLv + '！已达成就上限 🔒') : ('🎉 升级啦！现在是 Lv.' + newLv));
+    }
     showResult();
   }
   function showResult() {
@@ -642,8 +657,19 @@
   }
 
   function updateTopbar() {
-    $('levelBadge').textContent = '⭐ Lv.' + level();
-    $('xpNum').textContent = xpInLevel() + '/' + 100;
+    var lv = level(), capped = lv >= levelCap() && save.xp > xpForLevel(lv);
+    $('levelBadge').textContent = '⭐ Lv.' + lv + (capped ? ' 🔒' : '');
+    var pct = xpPct();
+    var xpEl = $('xpNum');
+    if (xpEl) xpEl.textContent = pct + '%';
+    var fill = $('xpFill');
+    if (fill) fill.style.width = pct + '%';
+    var xpStat = $('xpStat');
+    if (xpStat) {
+      var inLv = Math.min(xpInLevel(), xpToNext());
+      xpStat.title = '⚡ 经验 ' + inLv + '/' + xpToNext() +
+        (capped ? ' · 已满级，解锁更多成就可继续升级' : ' · 升级所需经验随等级递增（越高越难）');
+    }
     $('starNum').textContent = save.stars;
     $('foodNum').textContent = save.food || 0;
     $('coinNum').textContent = save.coins || 0;
@@ -654,4 +680,22 @@
     var hs = $('hudStats');
     if (hs) hs.style.visibility = 'visible';
   }
+
+  /* 顶部 HUD 状态栏点击解释（这些图标没有二级页面，纯展示，故点击弹一句话说明含义） */
+  function bindHudTips() {
+    var tips = {
+      levelBadge: '⭐ 等级：闯关升级，上限=成就数+1',
+      xpStat: '⚡ 经验：答对得经验，等级越高升级越难',
+      starStat: '🏆 星星：完成挑战获得的荣誉',
+      foodStat: '🍖 宠物粮食：去宠物乐园喂宠物',
+      coinStat: '🪙 金币：去积分商店兑换奖励'
+    };
+    Object.keys(tips).forEach(function (id) {
+      var el = $(id);
+      if (!el) return;
+      el.style.cursor = 'pointer';
+      el.addEventListener('click', function () { SFX.click(); toast(tips[id]); });
+    });
+  }
+  bindHudTips();
 

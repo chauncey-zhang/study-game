@@ -21,6 +21,7 @@ window.GAMES = [
   { id: 'reversi', name: '翻转棋', icon: '⚫', cat: 'strategy', type: 'dom', bestMode: 'max', desc: '黑白棋夹子翻转，抢占棋盘' },
   { id: 'rps', name: '石头剪刀布', icon: '✊', cat: 'strategy', type: 'dom', bestMode: 'max', desc: '和 AI 猜拳，看谁连胜更多' },
   { id: 'bulls', name: '猜数字', icon: '🔢', cat: 'strategy', type: 'dom', bestMode: 'min', desc: '逻辑推理猜出 4 位数字' },
+  { id: 'xiangqi', name: '中国象棋', icon: '🏮', cat: 'strategy', type: 'canvas', bestMode: 'max', desc: '楚河汉界，车马炮卒争雄' },
   { id: 'memory', name: '记忆翻牌', icon: '🃏', cat: 'strategy', type: 'dom', bestMode: 'min', desc: '翻开配对的卡片，考验记忆力' },
   { id: 'math24', name: '24 点', icon: '➕', cat: 'strategy', type: 'dom', bestMode: 'max', desc: '四张牌加减乘除凑出 24' },
 

@@ -158,6 +158,13 @@ function pinyinGroup() {
   if (pinyinTab === 'yunmu') return PINYIN.yunmu;
   return PINYIN.zhengti;
 }
+/* 读口诀时把单字母/拼音替换成正确「呼读音」（如 b→波、zh→知、ai→哀），
+ * 避免浏览器 TTS 把孤立字母 b 读成「逼」、p 读成「批」等错误发音 */
+function pyJingleSpeak(item, tail) {
+  if (!item) return;
+  var j = (item.jingle || '').split(item.ch).join(item.name);
+  TTS.speak(item.name + '。' + j + (tail || ''), 0.85);
+}
 function renderPinyinList() {
   var el = $('pinyinList'); el.innerHTML = '';
   var group = pinyinGroup();
@@ -179,7 +186,7 @@ function renderPinyinList() {
       e.stopPropagation();
       SFX.click();
       var it = group[parseInt(btn.getAttribute('data-i'), 10)];
-      TTS.speak(it.name + '。' + it.jingle, 0.85);
+      pyJingleSpeak(it);
     });
   });
   var body = $('pinyinHubScreen').querySelector('.hub-body');
@@ -616,7 +623,7 @@ $('pinyinClose').addEventListener('click', closePinyin);
 $('pyReadBtn').addEventListener('click', function () {
   if (!pyCurrent) return;
   SFX.click();
-  TTS.speak(pyCurrent.name + '。' + pyCurrent.jingle + '。例词：' + pyCurrent.word, 0.85);
+  pyJingleSpeak(pyCurrent, '。例词：' + pyCurrent.word);
 });
 $('pyPlayBtn').addEventListener('click', playStrokeAnim);
 $('pyClearBtn').addEventListener('click', function () { SFX.click(); pyUserStrokes = []; pyWriting = false; resetWriteCanvas(); });

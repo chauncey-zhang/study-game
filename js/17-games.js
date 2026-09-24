@@ -111,7 +111,7 @@ function gameFloat(text, x, y) {
   el.style.left = x + 'px';
   el.style.top = y + 'px';
   area.appendChild(el);
-  setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 900);
+  setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 1800);
 }
 function gameBurst(x, y, color, n) {
   var area = $('gamePlayArea');
@@ -342,16 +342,49 @@ document.addEventListener('keydown', function (e) {
 }, true);
 
 /* ---- 触摸/点击：canvas 统一换算坐标，dom 由游戏自理 ---- */
+var gPressT = 0, gPressCX = 0, gPressCY = 0;
 document.addEventListener('pointerdown', function (e) {
   if (!curGame || !gameStarted || gameOverShown) return;
   if (!curGameCtx || curGameCtx.def.type !== 'canvas') return;
   if (curGameCtx.canvas && !curGameCtx.canvas.contains(e.target)) return;
+  gDragActive = true;
+  gPressT = Date.now();
+  gPressCX = e.clientX;
+  gPressCY = e.clientY;
   var p = gameCanvasPos(e.clientX, e.clientY);
-  try { curGame.onTap(p.x, p.y); } catch (err) {}
+  try { if (curGame.onPress) curGame.onPress(p.x, p.y); } catch (err) {}
+  try { if (curGame.onTap) curGame.onTap(p.x, p.y); } catch (err) {}
 }, true);
 
+/* ---- 持续拖拽：手指/鼠标按住并移动时，持续把坐标转发给游戏 onMove，
+ * 让打砖块挡板、接水果篮子、飞机大战战机等能「按住连续跟手」，
+ * 而非只能点一下跳一下（onTap）或滑一下跳一格（onSwipe）。
+ * 仅当游戏实现了 onMove 才生效，不影响其它游戏。 ---- */
+function gameForwardMove(clientX, clientY) {
+  if (!curGame || !gameStarted || gameOverShown) return;
+  if (!curGameCtx || curGameCtx.def.type !== 'canvas') return;
+  if (typeof curGame.onMove !== 'function') return;
+  var p = gameCanvasPos(clientX, clientY);
+  try { curGame.onMove(p.x, p.y); } catch (err) {}
+}
+document.addEventListener('pointermove', function (e) {
+  if (!gDragActive) return;
+  gameForwardMove(e.clientX, e.clientY);
+}, true);
+document.addEventListener('pointerup', function (e) {
+  gDragActive = false;
+  if (!curGame || !gameStarted || gameOverShown) return;
+  if (!curGameCtx || curGameCtx.def.type !== 'canvas') return;
+  if (typeof curGame.onRelease !== 'function') return;
+  if (curGameCtx.canvas && !curGameCtx.canvas.contains(e.target)) return;
+  var dur = Date.now() - gPressT;
+  var p = gameCanvasPos(e.clientX, e.clientY);
+  try { curGame.onRelease(p.x, p.y, dur, e.clientX - gPressCX, e.clientY - gPressCY); } catch (err) {}
+}, true);
+document.addEventListener('pointercancel', function () { gDragActive = false; }, true);
+
 /* ---- 触摸滑动：统一分发（绑定一次，避免各游戏在固定容器上重复绑定导致监听泄漏） ---- */
-var gTouchX = 0, gTouchY = 0;
+var gTouchX = 0, gTouchY = 0, gDragActive = false;
 document.addEventListener('touchstart', function (e) {
   if (!curGame || !gameStarted || gameOverShown) return;
   gTouchX = e.touches[0].clientX;
@@ -365,6 +398,17 @@ document.addEventListener('touchend', function (e) {
   var d = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
   if (curGame.onSwipe) { try { curGame.onSwipe(d); } catch (err) {} }
 }, { passive: true });
+
+/* ---- 阻止游戏区内触摸滑动引发页面/容器滚动回弹（橡皮筋抖动） ----
+ * 仅当游戏已开始且该触摸落在游戏区 #gamePlayArea 内时阻止浏览器默认滚动手势。
+ * 用非 passive 监听才能 preventDefault（电视 WebView 对 CSS touch-action:none 支持差，必须 JS 兜底）。
+ * 不影响点击/原生控件：tap 不产生 touchmove，onSwipe 在 touchend 计算，均不受此拦截影响。 */
+document.addEventListener('touchmove', function (e) {
+  if (!curGame || !gameStarted || gameOverShown) return;
+  var area = document.getElementById('gamePlayArea');
+  if (!area || !area.contains(e.target)) return;
+  e.preventDefault();
+}, { passive: false });
 
 /* ---- 未开始时的输入门控：拦截游戏区内的点击/指针，防止未点"开始"就能玩 ---- */
 function gateGameInput(e) {

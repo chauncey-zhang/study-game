@@ -43,15 +43,16 @@ function applyCosmetics() {
   document.body.className = cls.join(' ');
 }
 
-/* 出战宠物图标叠加帽子 */
+/* 出战宠物图标叠加帽子（帽子绝对定位到头顶中央，不再用上标跑到脚下） */
 function petIconWithHat(p) {
   if (!p) return '';
   var icon = p.icon;
+  var hat = '';
   if (save.activeHat && shopOwned(save.activeHat)) {
     var item = shopItem(save.activeHat);
-    if (item) icon += '<span class="pet-hat">' + item.icon + '</span>';
+    if (item) hat = '<span class="pet-hat">' + item.icon + '</span>';
   }
-  return icon;
+  return '<span class="pet-figure">' + icon + hat + '</span>';
 }
 
 function renderShop() {

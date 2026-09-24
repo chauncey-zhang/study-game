@@ -28,8 +28,8 @@
   function applyCustomCount(kind) {
     var inp = $(kind === 'mental' ? 'mentalCustomInput' : (kind === 'think' ? 'thinkCustomInput' : 'wordCustomInput'));
     var v = parseInt(inp.value, 10);
-    var max = kind === 'mental' ? 200 : (kind === 'think' ? 60 : 100);
-    if (!v || v < 5 || v > max) { toast('请输入 5 ~ ' + max + ' 之间的数量'); return; }
+    /* 不限制上限：只校验最小值，便于把固定题库（思维素养 175 题、单词 ~970 等）全部刷完 */
+    if (!v || v < 5) { toast('请输入不小于 5 的数量'); return; }
     if (kind === 'mental') { mentalCount = v; renderMentalHub(); }
     else if (kind === 'think') { thinkCount = v; renderThinkHub(); }
     else { wordCount = v; renderWordHub(); }

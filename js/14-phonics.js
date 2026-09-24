@@ -129,14 +129,22 @@ function renderPhoPairs(el) {
     });
   });
 }
-/* 朗读一个音标的"声音"：先读元音/辅音符号近似音，再读例词。
- * 浏览器 TTS 无法真读 IPA 音标（/iː/ 会被读成 slash i），故以例词 + 拼音近似提示为主 */
+/* 朗读一个音标的"声音"。
+ * 浏览器 TTS 无法直接读 IPA 音标（/iː/ 会被读成 slash i），故用数据里的「拼音近似读法」(hint，
+ * 如 /iː/→"衣"、/eɪ/→"诶衣"、/p/→"泼") 用中文语音近似还原音标发音，先让孩子听到音标近似音，
+ * 再跟读例词，方便对照口型模仿——即「先读音标、再读例词」，修复此前只读例词的问题。 */
 function speakPhoSound(item) {
   if (!item) return;
-  TTS.speakEn(item.words[0].w + ' ');
   var words = [];
   item.words.forEach(function (w) { words.push(w.w); });
-  setTimeout(function () { TTS.speakEn(words.join(', ')); }, 900);
+  var approx = (item.hint || '').replace(/\([^)]*\)/g, '').replace(/\s+/g, ''); // 去掉 (长)/(清) 等描述标注
+  if (approx) {
+    TTS.speak(approx, 0.8, 1.1, function () {
+      setTimeout(function () { TTS.speakEn(words.join(', ')); }, 350); // 近似音读完，再跟读例词
+    });
+  } else {
+    TTS.speakEn(words.join(', '));
+  }
 }
 /* 音标挑战（听音选音标 / 看音标选例词 交替，10 题一局） */
 function renderPhoQuiz(el) {

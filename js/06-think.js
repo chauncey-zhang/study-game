@@ -262,17 +262,21 @@
   function thinkPool(grade, count) {
     var sel = THINK_TYPES.filter(function (t) { return thinkSel[t.id]; });
     if (!sel.length) sel = THINK_TYPES.slice();
-    var pool = [], guard = 0;
-    while (pool.length < count && guard < 300) {
-      guard++;
+    var pool = [], added = 0;
+    /* 不再限制上限：生成类题型（找规律/图形/空间/数学）可按年级无限不重复产出；
+       仅当「一整轮遍历所有选中题型都没新增任何题」才退出——即固定题库（趣味156+逻辑19）已抽空，
+       此时无法再凑足数量，自然停止，避免死循环 */
+    while (pool.length < count) {
+      added = 0;
       sel.forEach(function (t) {
         if (pool.length >= count) return;
         var q = null;
         if (t.id === 'fun') { var a = shuffle(window.__THINK_FUN__ || []); if (a[0]) q = shuffleOptions(a[0]); }
         else if (t.id === 'logic') { var b = shuffle(window.__THINK_LOGIC__ || []); if (b[0]) q = shuffleOptions(b[0]); }
         else q = thinkPack(thinkGenOne(t.id, grade));
-        if (q) pool.push(q);
+        if (q) { pool.push(q); added++; }
       });
+      if (added === 0) break;
     }
     return shuffle(pool).slice(0, count);
   }

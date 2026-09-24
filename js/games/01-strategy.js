@@ -96,6 +96,21 @@ regGame('gomoku', function (ctx) {
     if(bx>=0)b[by][bx]=2;else aiEasy();
   }
   function ai(){ if(diff===1) aiHard(); else aiEasy(); }
+  /* 落子后推进：自动跳过无合法步的一方，直到某方有步或终局（避免无子可下时卡死） */
+  function advance(){
+    while(true){
+      if(!moves(1).length && !moves(2).length){
+        over=true; var d=tally(); if(d>0) wins++; ctx.finish(wins); return;
+      }
+      if(turn===2){
+        if(!moves(2).length){ turn=1; draw(); continue; }
+        ai(); turn=1; draw(); continue;
+      } else {
+        if(!moves(1).length){ turn=2; draw(); continue; }
+        break;
+      }
+    }
+  }
   function draw(){
     var h='<div class="game-diff-bar">'+
       '<button class="diff-btn'+(diff===0?' active':'')+'" data-game-control="1" data-d="0">😊 简单</button>'+
@@ -179,27 +194,43 @@ regGame('reversi', function (ctx) {
     if(bx>=0)put(bx,by,2);
   }
   function ai(){ if(diff===1) aiHard(); else aiEasy(); }
+  /* 落子后推进：自动跳过无合法步的一方，直到某方有步或终局（避免无子可下时卡死） */
+  function advance(){
+    while(true){
+      if(!moves(1).length && !moves(2).length){
+        over=true; var d=tally(); if(d>0) wins++; ctx.finish(wins); return;
+      }
+      if(turn===2){
+        if(!moves(2).length){ turn=1; draw(); continue; }
+        ai(); turn=1; draw(); continue;
+      } else {
+        if(!moves(1).length){ turn=2; draw(); continue; }
+        break;
+      }
+    }
+  }
   function draw(){
+    var ms=(turn===1&&!over)?moves(1):[];
     var h='<div class="game-diff-bar">'+
       '<button class="diff-btn'+(diff===0?' active':'')+'" data-game-control="1" data-d="0">😊 简单</button>'+
       '<button class="diff-btn'+(diff===1?' active':'')+'" data-game-control="1" data-d="1">🤖 困难</button>'+
       '</div><div class="rv-grid">';
     for(var y=0;y<8;y++)for(var x=0;x<8;x++){
-      var s=b[y][x]===1?'⚫':b[y][x]===2?'⚪':'';
-      h+='<button class="rv-cell" data-x="'+x+'" data-y="'+y+'">'+s+'</button>';
+      var legal=ms.some(function(m){return m[0]===x&&m[1]===y;});
+      var s=legal?'<span class="rv-dot"></span>':(b[y][x]===1?'⚫':b[y][x]===2?'⚪':'');
+      h+='<button class="rv-cell'+(legal?' rv-legal':'')+'" data-x="'+x+'" data-y="'+y+'">'+s+'</button>';
     }
     h+='</div>';
     ctx.container.innerHTML=h;
-    ctx.hud('黑 '+ (function(){var a=tally();return a>0?'领先':a<0?'落后':'平';})());
+    var tip=turn===1?'你的回合：点高亮处落子':(over?'本局结束':'AI 思考中…');
+    ctx.hud(tip+' · 黑 '+ (function(){var a=tally();return a>0?'领先':a<0?'落后':'平';})());
     ctx.container.querySelectorAll('.diff-btn').forEach(function(d){d.addEventListener('click',function(){
       var nd=+d.getAttribute('data-d');if(nd===diff)return;diff=nd;SFX.click();fresh();
     });});
     Array.prototype.forEach.call(ctx.container.querySelectorAll('.rv-cell'),function(c){c.addEventListener('click',function(){
       if(over||turn!==1)return;var x=+c.getAttribute('data-x'),y=+c.getAttribute('data-y');
-      var ms=moves(1);if(!ms.some(function(m){return m[0]===x&&m[1]===y;}))return;
-      put(x,y,1);SFX.click();turn=2;draw();
-      var am=moves(2);if(am.length){ai();turn=1;draw();}
-      if(!moves(1).length&&!moves(2).length){over=true;var d=tally();if(d>0)wins++;ctx.finish(wins);}
+      var ms=moves(1);if(!ms.length||!ms.some(function(m){return m[0]===x&&m[1]===y;})){ctx.toast('请点击高亮的空位落子');return;}
+      put(x,y,1);SFX.click();turn=2;advance();
     });});
   }
   function fresh(){
@@ -266,6 +297,8 @@ regGame('bulls', function (ctx) {
 regGame('memory', function (ctx) {
   var cards, flipped, lock, steps, matched, over;
   var EMOJI=['🍎','🍌','🍇','🍉','🍓','🍒','🥝','🍑','🐶','🐱','🐰','🐻'];
+  /* 兜底配色：部分老设备（电视内核）渲染不出 emoji，用专属背景色保证可区分 */
+  var MEM_COL=['#ffd6d6','#ffe9b3','#d6f5d6','#cfeffd','#e6d6ff','#ffd6ef','#d6fff0','#fff3c4','#ffd9c2','#d9e8ff','#e8ffd6','#f0d6ff'];
   function fresh(){
     var pairs=gShuffle(EMOJI).slice(0,8);cards=gShuffle(pairs.concat(pairs));
     flipped=[];lock=false;steps=0;matched=0;over=false;matchedArr=[];draw();
@@ -274,7 +307,8 @@ regGame('memory', function (ctx) {
     var h='<div class="mem-grid">';
     for(var i=0;i<cards.length;i++){
       var up=flipped.indexOf(i)!==-1||matchedArr.indexOf(i)!==-1;
-      h+='<button class="mem-cell'+(up?' up':'')+'" data-i="'+i+'">'+(up?cards[i]:'❓')+'</button>';
+      var bg=up?(' style="background:'+MEM_COL[EMOJI.indexOf(cards[i])%MEM_COL.length]+'"'):'';
+      h+='<button class="mem-cell'+(up?' up':'')+'" data-i="'+i+'"'+bg+'>'+(up?cards[i]:'❓')+'</button>';
     }
     h+='</div>';
     ctx.container.innerHTML=h;

@@ -172,23 +172,26 @@
    * - 自动下载：跨天每天 1 次（持久化日期防刷新/多开重复）
    */
   var lastLSCheck = 0;
-  function autoBackupTick(forceDl) {
+  /**
+   * 核心入口：在 persist() 后调用。
+   * - 内存快照 / localStorage 备份槽 / IndexedDB 今日快照：每次都写，保证清理缓存后
+   *   回退到「最新进度」（含签到等即时写入），杜绝因 30s/跨天限流导致备份滞后而丢数据。
+   * - 自动下载：跨天每天 1 次（持久化日期防刷新/多开重复）；noDownload=true（导入/还原后）
+   *   只写备份槽不下载文件，避免恢复完又立刻弹一份下载，体验差。
+   */
+  function autoBackupTick(forceDl, noDownload) {
     try {
       var snap = buildSnapshot();
-      memSnapshot = snap; // 内存快照永远最新
-
+      memSnapshot = snap;                 // 内存快照永远最新
+      lsBackupSave(snap);                 // B：localStorage 备份槽（每次写，清理缓存首选回退源）
+      idbPut('day-' + todayKey(), snap);  // C：IndexedDB 今日快照（每次写，常能躲过 localStorage 清理）
+      idbPrune();
       var now = Date.now();
-      var newDay = (lastPersistTs === 0) ? true : !sameDay(new Date(lastPersistTs), new Date(now));
-      var due = newDay || (now - lastLSCheck >= 30000);
-      if (due) {
-        lastLSCheck = now;
-        lsBackupSave(snap);          // B：localStorage 备份槽
-        idbPut('day-' + todayKey(), snap); // C：IndexedDB 今日快照
-        idbPrune();
-      }
       lastPersistTs = now;
+      lastLSCheck = now;
 
-      /* 自动下载：跨天每天 1 次；forceDl=true（登录/切换/还原后）跳过节流立即下载 */
+      if (noDownload) return; // 导入/还原后同步：只写槽+快照，不自动下载
+      /* 自动下载：跨天每天 1 次；forceDl=true（登录/切换后）跳过节流立即下载 */
       var lastDlDay = getLS(LAST_DL_KEY) || '';
       if (forceDl || (lastDlDay !== todayKey() && (now - lastDownTs >= 60000))) {
         if (!downTimer) {
@@ -297,9 +300,10 @@
     });
   }
 
-  /* 立即同步一次备份（导入/还原成功后调用） */
-  function syncBackupNow() {
-    try { autoBackupTick(true); } catch (e) {}
+  /* 立即同步一次备份（导入/还原成功后调用）。
+     noDownload=true：只写备份槽+快照、不触发自动下载，避免「恢复完又立刻下载一份」的差体验 */
+  function syncBackupNow(noDownload) {
+    try { autoBackupTick(true, !!noDownload); } catch (e) {}
   }
 
   /* ===================== 关闭前：静默保存 + 埋标记 + 确认框 ===================== */

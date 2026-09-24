@@ -26,11 +26,11 @@
   <div class="topbar">
     <div class="brand"><span class="logo">🎓</span>知识大冒险</div>
     <div class="stats" id="hudStats" style="visibility:hidden">
-      <div class="lv-badge" id="levelBadge">⭐ Lv.1</div>
-      <div class="stat">⚡ <span class="num" id="xpNum">0</span></div>
-      <div class="stat">🏆 <span class="num" id="starNum">0</span></div>
-      <div class="stat">🍖 <span class="num" id="foodNum">0</span></div>
-      <div class="stat">🪙 <span class="num" id="coinNum">0</span></div>
+      <div class="lv-badge" id="levelBadge" title="点击查看含义">⭐ Lv.1</div>
+      <div class="stat xp-stat" id="xpStat" title="点击查看含义">⚡ <span class="xp-bar"><span class="xp-fill" id="xpFill"></span></span> <span class="num" id="xpNum">0%</span></div>
+      <div class="stat" id="starStat" title="点击查看含义">🏆 <span class="num" id="starNum">0</span></div>
+      <div class="stat" id="foodStat" title="点击查看含义">🍖 <span class="num" id="foodNum">0</span></div>
+      <div class="stat" id="coinStat" title="点击查看含义">🪙 <span class="num" id="coinNum">0</span></div>
       <button class="btn btn-icon" id="musicBtn" title="背景音乐">🎵</button>
       <button class="btn btn-icon" id="shopBtn" title="积分商店">🛒</button>
       <button class="btn btn-icon pet-btn" id="petBtn" title="宠物乐园">🐾</button>
@@ -172,7 +172,7 @@
       <div class="hub-card">
         <div class="hub-label">📝 本次题量</div>
         <div class="count-row" id="mentalCountRow"></div>
-        <div class="custom-count">✏️ 自定义数量：<input type="number" id="mentalCustomInput" min="5" max="200" placeholder="5~200"><button class="btn btn-outline custom-apply" id="mentalCustomBtn">确定</button></div>
+        <div class="custom-count">✏️ 自定义数量：<input type="number" id="mentalCustomInput" min="5" placeholder="≥5，不限制上限"><button class="btn btn-outline custom-apply" id="mentalCustomBtn">确定</button></div>
         <button class="btn btn-primary hub-start" id="mentalStartBtn">🚀 一键生成，开始挑战！</button>
       </div>
       <div class="hub-card">
@@ -193,7 +193,7 @@
       <div class="hub-card">
         <div class="hub-label">📝 本次词量</div>
         <div class="count-row" id="wordCountRow"></div>
-        <div class="custom-count">✏️ 自定义数量：<input type="number" id="wordCustomInput" min="5" max="100" placeholder="5~100"><button class="btn btn-outline custom-apply" id="wordCustomBtn">确定</button></div>
+        <div class="custom-count">✏️ 自定义数量：<input type="number" id="wordCustomInput" min="5" placeholder="≥5，不限制上限"><button class="btn btn-outline custom-apply" id="wordCustomBtn">确定</button></div>
         <button class="btn btn-primary hub-start" id="wordStartBtn">🚀 开始单词闯关（随机抽词）！</button>
         <button class="btn btn-gold hub-start" id="wordReviewBtn" style="display:none">📖 复习错词</button>
       </div>
@@ -219,7 +219,7 @@
       <div class="hub-card">
         <div class="hub-label">📝 本次题量</div>
         <div class="count-row" id="thinkCountRow"></div>
-        <div class="custom-count">✏️ 自定义数量：<input type="number" id="thinkCustomInput" min="5" max="60" placeholder="5~60"><button class="btn btn-outline custom-apply" id="thinkCustomBtn">确定</button></div>
+        <div class="custom-count">✏️ 自定义数量：<input type="number" id="thinkCustomInput" min="5" placeholder="≥5，不限制上限"><button class="btn btn-outline custom-apply" id="thinkCustomBtn">确定</button></div>
       </div>
       <div class="hub-card">
         <div class="hub-label">🧩 选题型（点击切换，可多选）</div>
@@ -696,6 +696,7 @@
 <script src="js/games/04-react.js"></script>
 <script src="js/games/05-path.js"></script>
 <script src="js/games/06-observe.js"></script>
+<script src="js/games/07-xiangqi.js"></script>
 <script src="js/18-shop.js"></script>
 <script src="js/10-init.js"></script>
 <script src="js/11-anti.js"></script>
